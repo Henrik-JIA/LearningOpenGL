@@ -12,8 +12,17 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/output)
 # 包含头文件目录
 include_directories(include)
 
+# 添加库目录
+link_directories(lib)
+
 # 添加可执行文件
 add_executable(main src/main.cpp)
+
+# 链接第三方库
+target_link_libraries(main
+    glad
+    glfw3dll
+)
 
 # 添加清理目标
 add_custom_target(clean_all
