@@ -7,14 +7,22 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <cstring>       // 添加strerror支持
+#include <stdexcept>     // 添加标准异常支持
+
+struct ShaderFileTag {}; // 构造标签声明
 
 class Shader {
 public:
     unsigned int ID;
 
-    // 构造函数支持几何着色器（可选）
-    Shader(const char* vertexPath, const char* fragmentPath, const char* geometryPath = nullptr) {
-        // 1. 读取着色器代码
+    // 构造函数1：支持直接传入着色器源码
+    Shader(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
+        compileFromSource(vertexSource, fragmentSource, geometrySource);
+    }
+
+    // 构造函数2：支持从文件路径加载着色器
+    Shader(ShaderFileTag, const char* vertexPath, const char* fragmentPath, const char* geometryPath = nullptr) {
         std::string vertexCode = readFile(vertexPath);
         std::string fragmentCode = readFile(fragmentPath);
         std::string geometryCode;
@@ -23,27 +31,8 @@ public:
             geometryCode = readFile(geometryPath);
         }
 
-        // 2. 编译着色器
-        unsigned int vertex = compileShader(GL_VERTEX_SHADER, vertexCode.c_str());
-        unsigned int fragment = compileShader(GL_FRAGMENT_SHADER, fragmentCode.c_str());
-        unsigned int geometry;
-        
-        if(geometryPath != nullptr) {
-            geometry = compileShader(GL_GEOMETRY_SHADER, geometryCode.c_str());
-        }
-
-        // 3. 创建着色器程序
-        ID = glCreateProgram();
-        glAttachShader(ID, vertex);
-        glAttachShader(ID, fragment);
-        if(geometryPath != nullptr) glAttachShader(ID, geometry);
-        glLinkProgram(ID);
-        checkCompileErrors(ID, "PROGRAM");
-
-        // 4. 清理资源
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
-        if(geometryPath != nullptr) glDeleteShader(geometry);
+        compileFromSource(vertexCode.c_str(), fragmentCode.c_str(), 
+                        geometryPath ? geometryCode.c_str() : nullptr);
     }
 
     ~Shader() {
@@ -153,29 +142,53 @@ public:
     }
 
 private:
-    // 统一获取uniform位置
+    // 统一获取uniform位置（保持原有实现）
     GLint getUniformLocation(const std::string &name) const {
         return glGetUniformLocation(ID, name.c_str());
     }
 
-    // 文件读取
+    // 统一编译方法
+    void compileFromSource(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
+        unsigned int vertex = compileShader(GL_VERTEX_SHADER, vertexSource);
+        unsigned int fragment = compileShader(GL_FRAGMENT_SHADER, fragmentSource);
+        unsigned int geometry = 0;
+
+        if(geometrySource != nullptr) {
+            geometry = compileShader(GL_GEOMETRY_SHADER, geometrySource);
+        }
+
+        ID = glCreateProgram();
+        glAttachShader(ID, vertex);
+        glAttachShader(ID, fragment);
+        if(geometrySource != nullptr) glAttachShader(ID, geometry);
+        glLinkProgram(ID);
+        checkCompileErrors(ID, "PROGRAM");
+
+        glDeleteShader(vertex);
+        glDeleteShader(fragment);
+        if(geometrySource != nullptr) glDeleteShader(geometry);
+    }
+
+    // 文件读取方法
     std::string readFile(const char* path) {
-        std::string code;
         std::ifstream file;
+        std::stringstream buffer;
         
         file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         try {
-            file.open(path);
-            std::stringstream stream;
-            stream << file.rdbuf();
+            file.open(path, std::ios::binary);
+            buffer << file.rdbuf();
             file.close();
-            code = stream.str();
+            return buffer.str();
         }
         catch (std::ifstream::failure& e) {
-            std::cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: " << path 
-                      << "\nError details: " << e.what() << std::endl;
+            if(file.is_open()) file.close();
+            throw std::runtime_error(
+                std::string("SHADER::FILE_READ_FAILURE\n") +
+                "Path: " + path + "\n" +
+                "Error: " + strerror(errno)
+            );
         }
-        return code;
     }
 
     // 编译着色器
@@ -193,21 +206,22 @@ private:
     void checkCompileErrors(unsigned int shader, std::string type) {
         int success;
         char infoLog[1024];
+
         if (type != "PROGRAM") {
             glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
             if (!success) {
                 glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type 
-                          << "\n" << infoLog 
-                          << "\n---------------------------------------------------\n";
+                throw std::runtime_error(
+                    "SHADER_COMPILATION_ERROR: " + type + "\n" + infoLog
+                );
             }
         } else {
             glGetProgramiv(shader, GL_LINK_STATUS, &success);
             if (!success) {
                 glGetProgramInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type 
-                          << "\n" << infoLog 
-                          << "\n---------------------------------------------------\n";
+                throw std::runtime_error(
+                    "PROGRAM_LINKING_ERROR: " + type + "\n" + infoLog
+                );
             }
         }
     }
