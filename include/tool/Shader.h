@@ -10,30 +10,33 @@
 #include <cstring>       // 添加strerror支持
 #include <stdexcept>     // 添加标准异常支持
 
-struct ShaderFileTag {}; // 构造标签声明
-
 class Shader {
 public:
     unsigned int ID;
 
-    // 构造函数1：支持直接传入着色器源码
-    Shader(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
-        compileFromSource(vertexSource, fragmentSource, geometrySource);
+    // 函数1：支持直接传入着色器源码
+    static Shader FromSource(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
+        Shader shader;
+        shader.compileFromSource(vertexSource, fragmentSource, geometrySource);
+        return shader;
     }
 
-    // 构造函数2：支持从文件路径加载着色器
-    Shader(ShaderFileTag, const char* vertexPath, const char* fragmentPath, const char* geometryPath = nullptr) {
-        std::string vertexCode = readFile(vertexPath);
-        std::string fragmentCode = readFile(fragmentPath);
+    // 函数2：支持从文件路径加载着色器
+    static Shader FromFile(const char* vertexPath, const char* fragmentPath, const char* geometryPath = nullptr) {
+        Shader shader;
+        std::string vertexCode = shader.readFile(vertexPath);
+        std::string fragmentCode = shader.readFile(fragmentPath);
         std::string geometryCode;
         
         if(geometryPath != nullptr) {
-            geometryCode = readFile(geometryPath);
+            geometryCode = shader.readFile(geometryPath);
         }
 
-        compileFromSource(vertexCode.c_str(), fragmentCode.c_str(), 
-                        geometryPath ? geometryCode.c_str() : nullptr);
+        shader.compileFromSource(vertexCode.c_str(), fragmentCode.c_str(), 
+                               geometryPath ? geometryCode.c_str() : nullptr);
+        return shader;
     }
+
 
     ~Shader() {
         glDeleteProgram(ID);
@@ -142,6 +145,9 @@ public:
     }
 
 private:
+    // 将构造函数设为私有
+    Shader() = default;
+
     // 统一获取uniform位置（保持原有实现）
     GLint getUniformLocation(const std::string &name) const {
         return glGetUniformLocation(ID, name.c_str());

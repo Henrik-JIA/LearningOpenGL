@@ -117,9 +117,11 @@ int main(){
 
     glBindVertexArray(0);
 
-    // Shader ourShader("../src/03_Shaders03/shader/vertex.glsl", 
-    //                  "../src/03_Shaders03/shader/fragment.glsl");
-    Shader ourShader(vertexShaderSource, fragmentShaderSource);
+    // 从文件加载（原注释掉的版本）
+    // Shader ourShader = Shader::FromFile("../src/03_Shaders03/shader/vertex.glsl", 
+    //                                     "../src/03_Shaders03/shader/fragment.glsl");
+    // 从源码加载（原直接使用字符串的版本）
+    Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource);
 
     // 渲染设置
     // 启用顶点大小设置
