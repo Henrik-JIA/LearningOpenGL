@@ -10,9 +10,10 @@ const char *vertexShaderSource =    "#version 330 core\n"
                                     "layout (location = 0) in vec3 aPos;\n"
                                     "layout (location = 1) in vec3 aColor;\n"
                                     "out vec3 ourColor;\n"
+                                    "uniform float xOffset;\n"
                                     "void main()\n"
                                     "{\n"
-                                    "   gl_Position = vec4(aPos.x, -aPos.y, aPos.z, 1.0f);\n"
+                                    "   gl_Position = vec4(aPos.x + xOffset, -aPos.y, aPos.z, 1.0f);\n"
                                     "   ourColor = aColor;\n"
                                     "   gl_PointSize = 10.0f;\n"
                                     "}\0";
@@ -123,6 +124,11 @@ int main(){
     // 从源码加载（原直接使用字符串的版本）
     Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource);
 
+    // 设置偏移量
+    float xOffset = 0.5f;
+    // 获取uniform的地址
+    GLint uniformID = ourShader.getUniformLocation("xOffset");
+
     // 渲染设置
     // 启用顶点大小设置
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -152,6 +158,8 @@ int main(){
         // 使用着色器程序
         // glUseProgram(shaderProgram);
         ourShader.use();
+        ourShader.setFloat(uniformID, xOffset);
+
         // 绑定VAO（不需要每次都绑定，对于当前程序其实只需要绑定一次就可以了，因为我们没有更多的VAO了。）
         glBindVertexArray(VAO);
         // 绘制（绘制模式，起点，绘制几个点）

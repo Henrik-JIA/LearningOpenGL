@@ -47,6 +47,11 @@ public:
     }
 
     // Uniform 设置方法
+    // 统一获取uniform位置（保持原有实现）
+    GLint getUniformLocation(const std::string &name) const {
+        return glGetUniformLocation(ID, name.c_str());
+    }
+
     void setBool(const std::string &name, bool value) const {
         glUniform1i(getUniformLocation(name), (int)value);
     }
@@ -148,10 +153,7 @@ private:
     // 将构造函数设为私有
     Shader() = default;
 
-    // 统一获取uniform位置（保持原有实现）
-    GLint getUniformLocation(const std::string &name) const {
-        return glGetUniformLocation(ID, name.c_str());
-    }
+
 
     // 统一编译方法
     void compileFromSource(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
