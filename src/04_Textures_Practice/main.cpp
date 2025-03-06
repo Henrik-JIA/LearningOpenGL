@@ -34,11 +34,13 @@ in vec2 TexCoord;
 uniform sampler2D texture1;
 uniform sampler2D texture2;
 
+uniform float mixValue;
+
 void main()
 {
     // FragColor = vec4(ourColor, 1.0);
     // FragColor = texture(ourTexture, TexCoord) * vec4(ourColor, 1.0);
-    FragColor = mix(texture(texture1, TexCoord), texture(texture2, TexCoord), 0.2);
+    FragColor = mix(texture(texture1, TexCoord), texture(texture2, TexCoord), abs(sin(mixValue)));
 }
 )";
 
@@ -146,6 +148,9 @@ int main(){
     // 从源码加载（原直接使用字符串的版本）
     Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource);
 
+    // 获取mixValue的位置
+    GLint locMixValue = ourShader.getUniformLocation("mixValue");
+    
     // ===================================================================
 
     // ==================================设置纹理对象================================
@@ -240,6 +245,8 @@ int main(){
     // 启用线框模式(Wireframe Mode)，在该模式下，默认是GL_FILL，这里是GL_LINE。
     // 在GL_LINE时，绘制模式为GL_TRIANGLES时，也是绘制的线框，除非使用GL_FILL，将填充。
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    // 初始化mixValue
+    float mixValue = 0.0f;
 
     // 7.渲染循环(Render Loop)，它能在我们让GLFW退出前一直保持运行。
     // glfwWindowShouldClose函数：检查一次GLFW是否被要求退出。
@@ -264,6 +271,10 @@ int main(){
         // glUseProgram(shaderProgram);
         ourShader.use();
         // ourShader.setFloat(uniformID, xOffset);
+
+        // 设置mixValue
+        mixValue = glfwGetTime();
+        ourShader.setFloat(locMixValue, mixValue);
 
         // 给纹理采样器分配一个位置值，需要通过做色器类中的uniform相关的set进行赋值。
         ourShader.setInt(locTexture1, 0);

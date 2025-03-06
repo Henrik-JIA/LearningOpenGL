@@ -153,8 +153,6 @@ private:
     // 将构造函数设为私有
     Shader() = default;
 
-
-
     // 统一编译方法
     void compileFromSource(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
         unsigned int vertex = compileShader(GL_VERTEX_SHADER, vertexSource);
