@@ -3,6 +3,8 @@
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -87,17 +89,17 @@ public:
     void setVec4(const std::string &name, float x, float y, float z, float w) const {
         glUniform4f(getUniformLocation(name), x, y, z, w);
     }
-
+    
     void setMat2(const std::string &name, const glm::mat2 &mat) const {
-        glUniformMatrix2fv(getUniformLocation(name), 1, GL_FALSE, &mat[0][0]);
+        glUniformMatrix2fv(getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(mat));
     }
 
     void setMat3(const std::string &name, const glm::mat3 &mat) const {
-        glUniformMatrix3fv(getUniformLocation(name), 1, GL_FALSE, &mat[0][0]);
+        glUniformMatrix3fv(getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(mat));
     }
 
     void setMat4(const std::string &name, const glm::mat4 &mat) const {
-        glUniformMatrix4fv(getUniformLocation(name), 1, GL_FALSE, &mat[0][0]);
+        glUniformMatrix4fv(getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(mat));
     }
     
     // 新增的设置方法，接收uniform位置作为参数
@@ -138,15 +140,15 @@ public:
     }
 
     void setMat2(GLint location, const glm::mat2 &mat) const {
-        glUniformMatrix2fv(location, 1, GL_FALSE, &mat[0][0]);
+        glUniformMatrix2fv(location, 1, GL_FALSE, glm::value_ptr(mat));
     }
 
     void setMat3(GLint location, const glm::mat3 &mat) const {
-        glUniformMatrix3fv(location, 1, GL_FALSE, &mat[0][0]);
+        glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(mat));
     }
 
     void setMat4(GLint location, const glm::mat4 &mat) const {
-        glUniformMatrix4fv(location, 1, GL_FALSE, &mat[0][0]);
+        glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat));
     }
 
 private:
