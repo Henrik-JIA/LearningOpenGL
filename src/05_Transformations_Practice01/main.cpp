@@ -303,23 +303,29 @@ int main(){
         // 可以通过调用glClear函数来清空屏幕的颜色缓冲，它接受一个缓冲位(Buffer Bit)来指定要清空的缓冲，
         // 可能的缓冲位有GL_COLOR_BUFFER_BIT，GL_DEPTH_BUFFER_BIT和GL_STENCIL_BUFFER_BIT。由于现在我们只关心颜色值，所以我们只清空颜色缓冲。
         // 调用glClear函数，清除颜色缓冲之后，整个颜色缓冲都会被填充为glClearColor里所设置的颜色
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);  
+
         // 绘制物体
         // 使用着色器程序
         // glUseProgram(shaderProgram);
         ourShader.use();
-        // ourShader.setFloat(uniformID, xOffset);
 
         // 设置mixValue
         factor = glfwGetTime();
         ourShader.setFloat(locFactor, factor);
 
+        // 绘制第一个物体
         // 设置transform
-        // 先旋转后平移
-        trans = glm::translate(trans, glm::vec3(0.5, 0.0, 0.0));
-        trans = glm::rotate(trans, glm::radians(factor * 10.0f), glm::vec3(0.0, 0.0, 1.0));
+        // 先旋转后平移：物体会先绕原点旋转，然后平移到目标位置。
+        trans = glm::translate(trans, glm::vec3(-0.5, 0.0, 0.0));
+        trans = glm::rotate(trans, glm::radians(factor * 20.0f), glm::vec3(0.0, 0.0, 1.0));
         trans = glm::scale(trans, glm::vec3(0.5, 0.5, 0.5));
+        // 先平移后旋转：物体会先移动到新位置，然后绕原点旋转（会产生"公转"效果）。
+        // trans = glm::scale(trans, glm::vec3(0.5, 0.5, 0.5));
+        // trans = glm::rotate(trans, glm::radians(factor * 10.0f), glm::vec3(0.0, 0.0, 1.0));
+        // trans = glm::translate(trans, glm::vec3(0.5, 0.0, 0.0));
         ourShader.setMat4(locTransform, trans);
+        // 重置trans
         trans = glm::mat4(1.0f);
 
         // 给纹理采样器分配一个位置值，需要通过做色器类中的uniform相关的set进行赋值。
@@ -343,6 +349,19 @@ int main(){
         //// glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // 使用EBO索引缓冲对象来进行绘制
+        glDrawElements(GL_POINTS, 6, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        
+        // 绘制第二个物体（通过调整位置、缩放、旋转来控制点的位置，并重新绘制）
+        // 重新设置transform
+        trans = glm::translate(trans, glm::vec3(0.5, 0.0, 0.0));
+        // 注意：这里如果z轴也使用sin函数，会存在z轴的值反转，图像会颠倒。
+        trans = glm::scale(trans, glm::vec3(sin(factor) * 0.5, sin(factor) * 0.5, sin(factor) *  0.5));
+        ourShader.setMat4(locTransform, trans);
+        // 重置trans
+        trans = glm::mat4(1.0f);
+        // 绘制新的位置
+        glDrawElements(GL_POINTS, 6, GL_UNSIGNED_INT, 0);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 
