@@ -1,7 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <tool/Shader.h>
-#include <geometry/PlaneGeometry.h>
+#include <geometry/BoxGeometry.h>
 
 #include <iostream>
 
@@ -17,6 +17,7 @@ layout(location = 2) in vec2 TexCoords;
 
 out vec3 outPosition;
 out vec2 outTexCoord;
+out float stp;
 
 uniform float factor;
 
@@ -26,8 +27,8 @@ uniform float factor;
   * |  0   sin0  cos0   0|    |z|    |sin0 * y + cos0 * z|
   * |  0   0      0     1|    |w|    |         1         |
   */
-mat4 rotateX(float angle) {
-  return mat4(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, cos(angle), -sin(angle), 0.0f, 0.0f, sin(angle), cos(angle), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+mat4 rotateX(float _angle) {
+  return mat4(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, cos(_angle), -sin(_angle), 0.0f, 0.0f, sin(_angle), cos(_angle), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 /**
@@ -36,8 +37,8 @@ mat4 rotateX(float angle) {
   * | -sin0  0  cos0   0|    |z|    |-sinθ *x + cosθ * z|
   * |  0     0     0   1|    |w|    |         1         |
   */
-mat4 rotateY(float angle) {
-  return mat4(cos(angle), 0.0f, sin(angle), 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, -sin(angle), 0.0f, cos(angle), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+mat4 rotateY(float _angle) {
+  return mat4(cos(_angle), 0.0f, sin(_angle), 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, -sin(_angle), 0.0f, cos(_angle), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 /**
@@ -46,8 +47,8 @@ mat4 rotateY(float angle) {
   * |  0       0     1   0|    |z|    |         z         |
   * |  0       0     0   1|    |w|    |         1         |
   */
-mat4 rotateZ(float angle) {
-  return mat4(cos(angle), -sin(angle), 0.0f, 0.0f, sin(angle), cos(angle), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+mat4 rotateZ(float _angle) {
+  return mat4(cos(_angle), -sin(_angle), 0.0f, 0.0f, sin(_angle), cos(_angle), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 mat4 rotateXYZ(float angle) {
@@ -55,9 +56,15 @@ mat4 rotateXYZ(float angle) {
 }
 
 void main() {
+
+  // mat4 rotate = rotateZ(factor) * rotateY(factor) * rotateX(factor);
+
   gl_Position = rotateXYZ(factor) * vec4(Position, 1.0f);
+
   // gl_Position = vec4(Position, 1.0f);
-  gl_PointSize = 10.0f;
+
+  stp = length(Position.y - sin(factor * 5.0));
+  gl_PointSize = 5.0f * stp;
   outTexCoord = TexCoords;
 }
 )";
@@ -66,13 +73,17 @@ const char *fragmentShaderSource =  R"(
 #version 330 core
 out vec4 FragColor;
 in vec2 outTexCoord;
+in float stp;
 
 uniform sampler2D texture1;
 uniform sampler2D texture2;
 
 void main() {
-  FragColor = mix(texture(texture1, outTexCoord), texture(texture2, outTexCoord), 0.2);
-  // FragColor = texture(texture1, outTexCoord);
+  FragColor = mix(texture(texture1, outTexCoord), texture(texture2, outTexCoord), 0.1);
+
+  // vec2 coord = gl_PointCoord - vec2(0.5);
+  // float r = float(length(coord) > 0.5);
+  // FragColor = vec4(0.0, stp * 0.5, stp, (1 - r) * stp);// 蓝色过度色
 }
 )";
 
@@ -98,7 +109,7 @@ const unsigned int SCREEN_HEIGHT = 600;
 
 using namespace std;
 
-int main()
+int main(int argc, char *argv[])
 {
   glfwInit();
   // 设置主要和次要版本
@@ -123,35 +134,24 @@ int main()
   }
   // 设置视口
   glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-  // 渲染相关设置：
   // 设置背景颜色
   glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
   // glClearColor(25.0f / 255.0f, 25.0f / 255.0f, 25.0f / 255.0f, 1.0f);
-  // 启用点大小
   glEnable(GL_PROGRAM_POINT_SIZE);
-  // // 启用混合
-  // glEnable(GL_BLEND);
-  // // 设置混合函数
-  // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  // 设置绘制模式
-  // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  // 启用深度测试
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
 
   // 注册窗口变化监听
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-  // 创建着色器（包括顶点着色器、片段着色器、着色器程序、uniform设置）
   Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource);
 
-  // 获取uniform变量location
-  GLint texture1Location = ourShader.getUniformLocation("texture1");
-  GLint texture2Location = ourShader.getUniformLocation("texture2");
-  float factor = 0.0;
-  GLint locFactor = ourShader.getUniformLocation("factor");
-
-
-  // 创建平面几何体（包括几何的顶点、index、VAO、VBO、EBO）
-  PlaneGeometry planeGeometry(1.0, 1.0, 8, 8);
+  BoxGeometry boxGeometry(0.2, 1.5, 0.2, 1.0, 100.0, 1.0);
+  // BoxGeometry boxGeometry(1.0, 0.1, 0.1, 1.0, 1.0, 1.0);
 
   // 生成纹理
   unsigned int texture1, texture2;
@@ -167,7 +167,7 @@ int main()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-  // 图像y轴翻转，因为OpenGL要求y轴0.0坐标是在图片的底部的，但是图片的y轴0.0坐标通常在顶部。
+  // 图像y轴翻转
   stbi_set_flip_vertically_on_load(true);
 
   // 加载图片
@@ -191,7 +191,7 @@ int main()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
   // 加载图片
-  data = stbi_load("../static/texture/awesomeface.png", &width, &height, &nrChannels, 0);
+  data = stbi_load("../static/texture/dot.png", &width, &height, &nrChannels, 0);
 
   if (data)
   {
@@ -199,22 +199,26 @@ int main()
     glGenerateMipmap(GL_TEXTURE_2D);
   }
   stbi_image_free(data);
+  ourShader.use();
+  ourShader.setInt("texture1", 0);
+  ourShader.setInt("texture2", 1);
 
+  float factor = 0.0;
 
   while (!glfwWindowShouldClose(window))
   {
     processInput(window);
 
     // 渲染指令
-
     // 清除颜色缓冲
-    glClear(GL_COLOR_BUFFER_BIT);
+    // glClear(GL_COLOR_BUFFER_BIT);
+    // 同时清除颜色和深度缓冲
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     ourShader.use();
-    ourShader.setInt(texture1Location, 0);
-    ourShader.setInt(texture2Location, 1);
+
     factor = glfwGetTime();
-    ourShader.setFloat(locFactor, factor * 0.2f);
+    ourShader.setFloat("factor", -factor * 0.3);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture1);
@@ -222,17 +226,17 @@ int main()
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, texture2);
 
-    glBindVertexArray(planeGeometry.VAO);
+    glBindVertexArray(boxGeometry.VAO);
 
-    glDrawElements(GL_TRIANGLES, planeGeometry.indices.size(), GL_UNSIGNED_INT, 0);
-    glDrawElements(GL_POINTS, planeGeometry.indices.size(), GL_UNSIGNED_INT, 0);
-    // glDrawElements(GL_LINE_LOOP, planeGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    // glDrawElements(GL_TRIANGLES, boxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_POINTS, boxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_LINE_LOOP, boxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
-  planeGeometry.dispose();
+  boxGeometry.dispose();
   glfwTerminate();
   return 0;
 }

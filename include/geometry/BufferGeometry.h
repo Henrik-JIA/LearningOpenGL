@@ -104,10 +104,9 @@ protected:
             sizeof(Vertex)：步长（每个顶点数据的总字节长度）
             (void *)0：起始偏移量
         */
-
         // Position 位置
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
-        glEnableVertexAttribArray(0); // 启用顶点属性位置0
+        glEnableVertexAttribArray(0); // 启用顶点属性位置0，0表示glsl中的layout(location=0)
 
         // Normal 法线
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Normal));
