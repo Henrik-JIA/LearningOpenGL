@@ -1,5 +1,5 @@
-#ifndef SPHERE_GROMETRY
-#define SPHERE_GROMETRY
+#ifndef SPHERE_GEOMETRY
+#define SPHERE_GEOMETRY
 
 #include <geometry/BufferGeometry.h>
 

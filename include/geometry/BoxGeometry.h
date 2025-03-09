@@ -1,5 +1,5 @@
-#ifndef BOX_GROMETRY
-#define BOX_GROMETRY
+#ifndef BOX_GEOMETRY
+#define BOX_GEOMETRY
 
 #include <geometry/BufferGeometry.h>
 

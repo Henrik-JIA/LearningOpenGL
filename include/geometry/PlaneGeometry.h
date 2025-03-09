@@ -1,5 +1,5 @@
-#ifndef PLANE_GROMETRY
-#define PLANE_GROMETRY
+#ifndef PLANE_GEOMETRY
+#define PLANE_GEOMETRY
 
 #include <geometry/BufferGeometry.h>
 

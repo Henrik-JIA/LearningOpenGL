@@ -16,7 +16,7 @@ include_directories(include)
 link_directories(lib)
 
 # 添加可执行文件
-add_executable(main src/06_Use_Box_Geometry/main.cpp)
+add_executable(main src/07_Coordinate_Systems_02/main.cpp)
 
 # 设置调试工作目录（VS Code CMake Tools需要）
 # set_target_properties(main PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/output")
