@@ -1,5 +1,5 @@
-#ifndef SHADER_H
-#define SHADER_H
+#ifndef SHADER_H // 检查是否未定义（第一次包含时）
+#define SHADER_H // 定义标识符（未定义就定义该标识符），如果后续再次包含时，检查到已定义，就跳过中间所有内容。
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
