@@ -22,7 +22,7 @@ file(GLOB SOURCES
 
 # 添加可执行文件
 add_executable(
-    main src/07_Coordinate_Systems_04/main.cpp
+    main src/08_Camera_04/main.cpp
     ${SOURCES}
 )
 
