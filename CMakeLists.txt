@@ -15,8 +15,16 @@ include_directories(include)
 # 添加库目录
 link_directories(lib)
 
+# 添加源文件（必须包含所有核心文件）
+file(GLOB SOURCES
+    ${CMAKE_SOURCE_DIR}/include/imgui/*.cpp
+)
+
 # 添加可执行文件
-add_executable(main src/07_Coordinate_Systems_03/main.cpp)
+add_executable(
+    main src/07_Coordinate_Systems_04/main.cpp
+    ${SOURCES}
+)
 
 # 设置调试工作目录（VS Code CMake Tools需要）
 # set_target_properties(main PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/output")
