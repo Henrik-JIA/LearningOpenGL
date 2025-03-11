@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <tool/Shader.h>
+#include <tool/Camera.h>
 #include <geometry/PlaneGeometry.h>
 #include <geometry/BoxGeometry.h>
 #include <geometry/SphereGeometry.h>
@@ -10,7 +11,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <tool/stb_image.h>
 
-#include <tool/gui.h>
+#include <tool/Gui.h>
 
 // 着色器代码
 const char *vertexShaderSource = R"(
@@ -59,7 +60,6 @@ int SCREEN_HEIGHT = 600;
 // 计算时间差
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-
 
 // 相机信息
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -112,6 +112,11 @@ int main()
   ImGui_ImplOpenGL3_Init(glsl_version);
 
   // ========================
+
+  // 初始化相机
+  // =======================
+  Camera camera(glm::vec3(0.0, 0.0, 5.0));
+  // =======================
 
   // 设置视口
   glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -268,6 +273,7 @@ int main()
 
     // 创建视图矩阵view
     glm::mat4 view = glm::mat4(1.0f);
+    view = camera.GetViewMatrix();
 
     // 相机位置，相机旋转方向，与看向的物体旋转方向是相反的
     // float camX = sin(glfwGetTime()) * radius;
@@ -275,7 +281,7 @@ int main()
     // view = glm::lookAt(glm::vec3(camX, 1.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 
     // 实际的目标点 = 相机位置 + 方向向量  = cameraPos + cameraFront → 得到的是相机正前方的一个点
-    view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+    // view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
     ourShader.setMat4(locView, view);
 
     // 创建投影矩阵projection
