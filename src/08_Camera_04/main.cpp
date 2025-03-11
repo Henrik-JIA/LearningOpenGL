@@ -372,7 +372,11 @@ void processInput(GLFWwindow *window)
 }
 
 // 鼠标移动回调
-void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+void mouse_callback(GLFWwindow *window, double xpos, double ypos) 
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
+
     // 左键：视角旋转
     if (isMousePressed) {
         float xoffset = xpos - lastX;
@@ -411,6 +415,9 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 // 鼠标按键回调
 void mouse_button_calback(GLFWwindow *window, int button, int action, int mods)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
+
   // 左键处理
   if (button == GLFW_MOUSE_BUTTON_LEFT) {
       if (action == GLFW_PRESS) {
@@ -433,6 +440,9 @@ void mouse_button_calback(GLFWwindow *window, int button, int action, int mods)
 
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
+
     const float baseSpeed = 0.5f;
     const float shiftMultiplier = 3.0f; // 按住Shift加速
     
