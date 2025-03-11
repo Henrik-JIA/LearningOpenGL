@@ -53,6 +53,10 @@ void main() {
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void mouse_button_calback(GLFWwindow *window, int button, int action, int mods);
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
+
 // 屏幕宽高
 int SCREEN_WIDTH = 800;
 int SCREEN_HEIGHT = 600;
@@ -61,18 +65,28 @@ int SCREEN_HEIGHT = 600;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-// 相机信息
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f); // 是相机朝向目标的方向向量
-glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+// 鼠标上一帧的位置
+bool isMousePressed = false;
+bool isRightMousePressed = false;
+double lastX = SCREEN_WIDTH / 2.0f;
+double lastY = SCREEN_HEIGHT / 2.0f;
+
+// 相机系统
+Camera camera(glm::vec3(0.0f, 0.0f, 5.0f));
+glm::vec3 cameraPos = camera.Position;
+glm::vec3 cameraFront = camera.Front;
+glm::vec3 cameraUp = camera.Up;
+// glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+// glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f); // 是相机朝向目标的方向向量
+// glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
 
 using namespace std;
 
 int main()
 {
+  // 初始化GLFW
   glfwInit();
-  // 设置主要和次要版本
-  const char* glsl_version = "#version 330";
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -87,42 +101,32 @@ int main()
   }
   glfwMakeContextCurrent(window);
 
+  // 初始化GLAD
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
   {
     std::cout << "Failed to initialize GLAD" << std::endl;
     return -1;
   }
 
-  // 创建imgui
-  // ========================
-  // Setup Dear ImGui context 上下文
+  // 设置回调函数
+  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  glfwSetCursorPosCallback(window, mouse_callback);
+  glfwSetMouseButtonCallback(window, mouse_button_calback);
+  glfwSetScrollCallback(window, scroll_callback);
+
+  // 初始化ImGui
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO(); (void)io;
+  ImGui::StyleColorsDark(); // 设置ImGui风格
+  ImGui_ImplGlfw_InitForOpenGL(window, true); // 设置渲染平台
+  ImGui_ImplOpenGL3_Init("#version 330"); // 设置渲染器后端
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-  
-  // 设置ImGui风格
-  ImGui::StyleColorsDark();
-  // ImGui::StyleColorsLight();
-  // ImGui::StyleColorsClassic();
 
-  // 设置渲染平台/设置渲染器后端
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init(glsl_version);
-
-  // ========================
-
-  // 初始化相机
-  // =======================
-  Camera camera(glm::vec3(0.0, 0.0, 5.0));
-  // =======================
-
-  // 设置视口
-  glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-  // 渲染相关设置：
-  // 启用点大小
-  glEnable(GL_PROGRAM_POINT_SIZE);
+  // OpenGL配置
+  glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT); // 设置视口
+  glEnable(GL_PROGRAM_POINT_SIZE); // 启用点大小
   // // 启用混合
   // glEnable(GL_BLEND);
   // // 设置混合函数
@@ -130,32 +134,24 @@ int main()
   // 设置绘制模式
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-  // 开启深度测试
-  glEnable(GL_DEPTH_TEST);
-
-  // 注册窗口变化监听
-  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  glEnable(GL_DEPTH_TEST); // 开启深度测试
 
   // 创建着色器（包括顶点着色器、片段着色器、着色器程序、uniform设置）
   Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource);
-
   // 获取uniform变量location
-  GLint texture1Location = ourShader.getUniformLocation("texture1");
-  GLint texture2Location = ourShader.getUniformLocation("texture2");
   float factor = 0.0;
   GLint locFactor = ourShader.getUniformLocation("factor");
+  GLint texture1Location = ourShader.getUniformLocation("texture1");
+  GLint texture2Location = ourShader.getUniformLocation("texture2");
   GLint locModel = ourShader.getUniformLocation("model");
   GLint locView = ourShader.getUniformLocation("view");
   GLint locProjection = ourShader.getUniformLocation("projection");
 
-  // 创建平面几何体（包括几何的顶点、index、VAO、VBO、EBO）
-  PlaneGeometry planeGeometry(1.0f, 1.0f, 1.0f, 1.0f);
-  // 创建立方体几何体
-  BoxGeometry boxGeometry(1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
-  // 创建球体
-  SphereGeometry sphereGeometry(0.5, 20.0, 20.0);
+  PlaneGeometry planeGeometry(1.0f, 1.0f, 1.0f, 1.0f); // 创建平面几何体（包括几何的顶点、index、VAO、VBO、EBO）
+  BoxGeometry boxGeometry(1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f); // 创建立方体几何体
+  SphereGeometry sphereGeometry(0.5, 20.0, 20.0); // 创建球体 
 
-  // 生成纹理
+  // 纹理加载
   unsigned int texture1, texture2;
   glGenTextures(1, &texture1);
   glBindTexture(GL_TEXTURE_2D, texture1);
@@ -216,10 +212,17 @@ int main()
     glm::vec3(-1.3f,  1.0f, -1.5f)  
   };
 
-  float fov = 60.0f;
+  float fov = 60.0f; // 视锥体的角度
   glm::vec3 view_translate = glm::vec3(0.0, 0.0, -5.0);
   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
   float radius = 5.0f;
+
+  // 旋转矩阵
+  glm::mat4 ex = glm::eulerAngleX(45.0f);
+  glm::mat4 ey = glm::eulerAngleY(45.0f);
+  glm::mat4 ez = glm::eulerAngleZ(45.0f);
+
+  glm::mat4 qularXYZ = glm::eulerAngleXYZ(45.0f, 45.0f, 45.0f);
 
   while (!glfwWindowShouldClose(window))
   {
@@ -242,9 +245,6 @@ int main()
       ImGui::SliderFloat("fov", &fov, 15.0f, 90.0f);
       ImGui::SliderInt("SCREEN_WIDTH", &SCREEN_WIDTH, 100, 1920);
       ImGui::SliderInt("SCREEN_HEIGHT", &SCREEN_HEIGHT, 100, 1080);
-      // // SliderFloat3的第二个参数：三维向量首地址（glm::vec3 的 .x 成员地址即整个向量的起始地址）
-      // ImGui::SliderFloat3("View Position", &view_translate.x, -10.0f, 10.0f);
-
       ImGui::End();
     }
 
@@ -303,10 +303,7 @@ int main()
       // model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
       
       // 使用欧拉角，先x，再y，最后z：
-      // glm::mat4 rotation = 
-      //     glm::eulerAngleZ(factor) * 
-      //     glm::eulerAngleY(factor) * 
-      //     glm::eulerAngleX(factor);
+      // glm::mat4 rotation = glm::eulerAngleZ(factor) * glm::eulerAngleY(factor) * glm::eulerAngleX(factor);
       // model = model * rotation;
 
       // 使用四元数
@@ -343,12 +340,15 @@ int main()
   return 0;
 }
 
+// 窗口大小回调
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+    SCREEN_WIDTH = width;
+    SCREEN_HEIGHT = height;
 }
 
-// 修改后的 processInput 应包含 ESC 检测和相机控制
+// 键盘输入处理
 void processInput(GLFWwindow *window)
 {
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -367,4 +367,80 @@ void processInput(GLFWwindow *window)
         cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+
+    camera.Position = cameraPos;
+}
+
+// 鼠标移动回调
+void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+    // 左键：视角旋转
+    if (isMousePressed) {
+        float xoffset = xpos - lastX;
+        float yoffset = lastY - ypos; // 反转Y轴
+
+        lastX = xpos;
+        lastY = ypos;
+
+        camera.ProcessMouseMovement(xoffset, yoffset);
+        cameraPos = camera.Position;
+        cameraFront = camera.Front;
+    }
+    // 右键：视角平移
+    else if (isRightMousePressed) {
+        float sensitivity = 0.03f;
+        float xoffset = xpos - lastX;
+        float yoffset = ypos - lastY;
+
+        lastX = xpos;
+        lastY = ypos;
+
+        glm::vec3 right = glm::normalize(glm::cross(cameraFront, cameraUp));
+        glm::vec3 up = cameraUp;
+
+        cameraPos -= right * xoffset * sensitivity;
+        cameraPos += up * yoffset * sensitivity;
+        camera.Position = cameraPos;
+    }
+    // 更新初始位置
+    else {
+        lastX = xpos;
+        lastY = ypos;
+    }
+}
+
+// 鼠标按键回调
+void mouse_button_calback(GLFWwindow *window, int button, int action, int mods)
+{
+  // 左键处理
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+      if (action == GLFW_PRESS) {
+          isMousePressed = true;
+          glfwGetCursorPos(window, &lastX, &lastY);
+      } else if (action == GLFW_RELEASE) {
+          isMousePressed = false;
+      }
+  }
+  // 右键处理
+  else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+      if (action == GLFW_PRESS) {
+          isRightMousePressed = true;
+          glfwGetCursorPos(window, &lastX, &lastY);
+      } else if (action == GLFW_RELEASE) {
+          isRightMousePressed = false;
+      }
+  }
+}
+
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+{
+    const float baseSpeed = 0.5f;
+    const float shiftMultiplier = 3.0f; // 按住Shift加速
+    
+    float actualSpeed = baseSpeed;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        actualSpeed *= shiftMultiplier;
+    }
+
+    cameraPos += cameraFront * (float)yoffset * actualSpeed;
+    camera.Position = cameraPos;
 }
