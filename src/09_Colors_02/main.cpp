@@ -20,19 +20,37 @@ layout(location = 0) in vec3 Position;
 layout(location = 1) in vec3 Normal;
 layout(location = 2) in vec2 TexCoords;
 
-out vec3 outPosition;
+out vec3 outNormal;
 out vec2 outTexCoord;
+out vec3 outFragPos;
 
+// MVP矩阵
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
+// 时间因子
 uniform float factor;
 
 void main() {
-  gl_Position = projection * view * model * vec4(Position, 1.0f);
+  // MVP矩阵
+  mat4 mvp = projection * view * model;
+  // 顶点位置
+  gl_Position = mvp * vec4(Position, 1.0f);
+  // 顶点大小
   gl_PointSize = 10.0f;
+
+  // 片段位置（只需乘以model矩阵，转为世界坐标）
+  outFragPos = vec3(model * vec4(Position, 1.0f));
+
+  // 纹理坐标
   outTexCoord = TexCoords;
+
+  // 法线矩阵（解决不等比缩放的模型，法向量不垂直于面）
+  mat3 normalMatrix = mat3(transpose(inverse(model)));
+  // 法向量
+  outNormal = normalMatrix * Normal;
+
 }
 )";
 
@@ -40,21 +58,67 @@ const char *fragmentShaderSource =  R"(
 #version 330 core
 out vec4 FragColor;
 in vec2 outTexCoord;
+in vec3 outNormal;
+in vec3 outFragPos;
 
 uniform sampler2D texture1;
 uniform sampler2D texture2;
 
+// 相机位置
+uniform vec3 viewPos;
+// 光照位置
+uniform vec3 lightPos;
+// 光照颜色
 uniform vec3 lightColor;
+// 环境光强度
 uniform float ambientStrength;
+// 镜面强度
+uniform float specularStrength;
+// 镜面光高光系数
+uniform int shininess;
 
 void main() {
-  
-  vec3 ambient = ambientStrength * lightColor;
-  vec3 result = ambient * vec3(1.0f, 0.5f, 0.31f);
+  // 物体颜色
+  vec3 objectColor = vec3(1.0f, 0.5f, 0.31f);
 
-  // FragColor = mix(texture(texture1, outTexCoord), texture(texture2, outTexCoord), 0.2);
-  // FragColor = texture(texture1, outTexCoord);
-  // FragColor = mix(texture(texture1, outTexCoord), texture(texture2, outTexCoord), 0.2);
+  // 混合纹理
+  vec4 textureColor = mix(texture(texture1, outTexCoord), texture(texture2, outTexCoord), 0.2);
+
+  // 环境光项
+  vec3 ambient = ambientStrength * lightColor;
+
+  // 漫反射项
+  vec3 norm = normalize(outNormal);
+  vec3 lightDir = normalize(lightPos - outFragPos);
+  float diff = max(dot(norm, lightDir), 0.0);
+  vec3 diffuse = diff * lightColor;
+
+  // 镜面光项
+  // 计算视线方向（这里所有射线均是向外的）
+  vec3 viewDir = normalize(viewPos - outFragPos);
+  // 计算反射方向
+  vec3 reflectDir = reflect(-lightDir, norm);
+  // 计算镜面光强度（幂次项shininess越大，高光范围约集中）
+  float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+  vec3 specular = specularStrength * spec * lightColor;
+
+  // 仅环境光项
+  // vec3 result = ambient * objectColor; 
+  // vec3 result = ambient * vec3(textureColor);
+
+  // 仅漫反射项
+  // vec3 result = diffuse * objectColor;
+  // vec3 result = diffuse * vec3(textureColor);
+
+  // 仅镜面光项
+  // vec3 result = specular * objectColor;
+  // vec3 result = specular * vec3(textureColor);
+
+  // 环境光+漫反射+镜面光
+  // vec3 result = (ambient + diffuse + specular) * objectColor;
+  vec3 result = (ambient + diffuse + specular) * vec3(textureColor);
+  
+  // 最终颜色
   FragColor = vec4(result, 1.0);
 }
 )";
@@ -85,7 +149,6 @@ void main() {
   FragColor = vec4(1);
 }
 )";
-
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -182,6 +245,7 @@ int main()
   // 获取uniform变量location
   float factor = 0.0;
   GLint locFactor = ourShader.getUniformLocation("factor");
+  GLint locLightPos = ourShader.getUniformLocation("lightPos");
   GLint texture1Location = ourShader.getUniformLocation("texture1");
   GLint texture2Location = ourShader.getUniformLocation("texture2");
   GLint locModel = ourShader.getUniformLocation("model");
@@ -189,10 +253,15 @@ int main()
   GLint locProjection = ourShader.getUniformLocation("projection");
 
   glm::vec3 lightPosition = glm::vec3(1.2f, 1.0f, 2.0f); // 光照位置
-  glm::vec3 lightColor = glm::vec3(0.0f, 1.0f, 0.0f); // 光照颜色
+  glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
   GLint locLightColor = ourShader.getUniformLocation("lightColor");
-  float ambientStrength = 1.0f;
+  GLint locViewPos = ourShader.getUniformLocation("viewPos");
+  float ambientStrength = 0.5f;
   GLint locAmbientStrength = ourShader.getUniformLocation("ambientStrength");
+  float specularStrength = 0.5f;
+  GLint locSpecularStrength = ourShader.getUniformLocation("specularStrength");
+  int shininess = 32;
+  GLint locShininess = ourShader.getUniformLocation("shininess");
 
   GLint locLightModel = lightObjectShader.getUniformLocation("model");
   GLint locLightView = lightObjectShader.getUniformLocation("view");
@@ -284,7 +353,10 @@ int main()
       ImGui::SliderFloat("fov", &fov, 15.0f, 90.0f);
       ImGui::SliderInt("SCREEN_WIDTH", &SCREEN_WIDTH, 100, 1920);
       ImGui::SliderInt("SCREEN_HEIGHT", &SCREEN_HEIGHT, 100, 1080);
-      ImGui::SliderFloat("AmbientStrength", &ambientStrength, 0.1f, 5.0f);
+      ImGui::ColorEdit3("Light Color", (float*)&lightColor);
+      ImGui::SliderFloat("AmbientStrength", &ambientStrength, 0.1f, 2.0f);
+      ImGui::SliderFloat("SpecularStrength", &specularStrength, 0.1f, 2.0f);
+      ImGui::SliderInt("Shininess", &shininess, 1, 256);
       ImGui::End();
     }
 
@@ -298,10 +370,18 @@ int main()
     ourShader.use();    
     factor = glfwGetTime();
     ourShader.setFloat(locFactor, factor * 0.2f);
+
+    glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()), lightPosition.y, lightPosition.z);
+    ourShader.setVec3(locLightPos, lightPos);
+
+    ourShader.setVec3(locViewPos, camera.Position);
+
     ourShader.setInt(texture1Location, 0);
     ourShader.setInt(texture2Location, 1);
     ourShader.setVec3(locLightColor, lightColor);
     ourShader.setFloat(locAmbientStrength, ambientStrength);
+    ourShader.setFloat(locSpecularStrength, specularStrength);
+    ourShader.setInt(locShininess, shininess);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture1);
@@ -342,8 +422,7 @@ int main()
     // 绘制灯光物体
     lightObjectShader.use();
     glm::mat4 lightModel = glm::mat4(1.0f);
-    // lightModel = glm::translate(lightModel, glm::vec3(lightPosition.x * glm::sin(glfwGetTime()), lightPosition.y, lightPosition.z));
-    lightModel = glm::translate(lightModel, glm::vec3(lightPosition.x, lightPosition.y, lightPosition.z));
+    lightModel = glm::translate(lightModel, lightPos);
     lightObjectShader.setMat4(locLightModel, lightModel);
     lightObjectShader.setMat4(locLightView, view);
     lightObjectShader.setMat4(locLightProjection, projection);
