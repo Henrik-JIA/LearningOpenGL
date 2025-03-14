@@ -61,17 +61,14 @@ in vec2 outTexCoord;
 in vec3 outNormal;
 in vec3 outFragPos;
 
-uniform sampler2D texture1;
-uniform sampler2D texture2;
-
 // 相机位置
 uniform vec3 viewPos;
 
 // 定义材质结构体，材质在各光照条件下的颜色情况
 struct Material{
   vec3 ambientColor; // 环境光颜色
-  vec3 diffuseColor; // 漫反射颜色
-  vec3 specularColor; // 高光颜色
+  sampler2D diffuseColor; // 漫反射颜色(纹理)
+  sampler2D specularColor; // 高光颜色(纹理)
   float shininess; // 高光指数
 };
 uniform Material material;
@@ -89,19 +86,21 @@ uniform Light light;
 
 void main() {
   // 物体颜色
-  vec3 objectColor = vec3(1.0f, 0.5f, 0.31f);
+  vec4 objectColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-  // 混合纹理
-  vec4 textureColor = mix(texture(texture1, outTexCoord), texture(texture2, outTexCoord), 0.2);
+  // 漫反射纹理采样颜色
+  vec3 diffuseTextureColor = vec3(texture(material.diffuseColor, outTexCoord));
+  // 高光纹理采样颜色
+  vec3 specularTextureColor = vec3(texture(material.specularColor, outTexCoord));
 
   // 环境光项
-  vec3 ambient = light.ambientStrength * material.ambientColor * light.color;
+  vec3 ambient = light.ambientStrength * diffuseTextureColor;
 
   // 漫反射项
   vec3 norm = normalize(outNormal);
   vec3 lightDir = normalize(light.position - outFragPos);
   float diff = max(dot(norm, lightDir), 0.0);
-  vec3 diffuse = light.diffuseStrength * diff * material.diffuseColor * light.color;
+  vec3 diffuse = light.diffuseStrength * diff * diffuseTextureColor;
 
   // 镜面光项
   // 计算视线方向（这里所有射线均是向外的）
@@ -110,23 +109,19 @@ void main() {
   vec3 reflectDir = reflect(-lightDir, norm);
   // 计算镜面光强度（幂次项shininess越大，高光范围约集中）
   float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-  vec3 specular = light.specularStrength * spec * material.specularColor * light.color;
+  vec3 specular = light.specularStrength * spec * specularTextureColor;
 
   // 仅环境光项
-  // vec3 result = ambient * objectColor; 
-  // vec3 result = ambient * vec3(textureColor);
+  // vec3 result = ambient * vec3(objectColor); 
 
   // 仅漫反射项
-  // vec3 result = diffuse * objectColor;
-  // vec3 result = diffuse * vec3(textureColor);
+  // vec3 result = diffuse * vec3(objectColor);
 
   // 仅镜面光项
-  // vec3 result = specular * objectColor;
-  // vec3 result = specular * vec3(textureColor);
+  // vec3 result = specular * vec3(objectColor);
 
   // 环境光+漫反射+镜面光
-  // vec3 result = (ambient + diffuse + specular) * objectColor;
-  vec3 result = (ambient + diffuse + specular) * vec3(textureColor);
+  vec3 result = (ambient + diffuse + specular) * vec3(objectColor) * light.color;
   
   // 最终颜色
   FragColor = vec4(result, 1.0);
@@ -198,16 +193,16 @@ glm::vec3 cameraFront = camera.Front; // 相机前向
 glm::vec3 cameraUp = camera.Up; // 相机上向
 
 // 材质属性
-glm::vec3 materialAmbientColor = glm::vec3(1.0f, 0.5f, 0.31f); // 环境光颜色
-glm::vec3 materialDiffuseColor = glm::vec3(1.0f, 0.5f, 0.31f); // 漫反射颜色
-glm::vec3 materialSpecularColor = glm::vec3(0.5f, 0.5f, 0.5f); // 高光颜色
-int shininess = 32; // 高光指数
+glm::vec3 materialAmbientColor = glm::vec3(1.0f, 1.0f, 1.0f); // 环境光颜色
+int materialDiffuseColor = 0; // 漫反射颜色(纹理)
+int materialSpecularColor = 1; // 高光颜色(纹理)
+int shininess = 64; // 高光指数
 
 // 光源属性
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
 glm::vec3 lightPosition = glm::vec3(1.2f, 1.0f, 2.0f); // 光照位置
-glm::vec3 lightAmbientStrength = glm::vec3(0.2f, 0.2f, 0.2f); // 环境光强度
-glm::vec3 lightDiffuseStrength = glm::vec3(0.5f, 0.5f, 0.5f); // 漫反射强度
+glm::vec3 lightAmbientStrength = glm::vec3(0.4f, 0.4f, 0.4f); // 环境光强度
+glm::vec3 lightDiffuseStrength = glm::vec3(0.8f, 0.8f, 0.8f); // 漫反射强度
 glm::vec3 lightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 镜面反射强度
 
 // 创建多个立方体初始位置
@@ -289,9 +284,9 @@ int main()
   // 物体着色器：
   // 时间因子
   GLint locFactor = ourShader.getUniformLocation("factor");
-  // 纹理参数
-  GLint texture1Location = ourShader.getUniformLocation("texture1");
-  GLint texture2Location = ourShader.getUniformLocation("texture2");
+  // // 纹理参数
+  // GLint texture1Location = ourShader.getUniformLocation("texture1");
+  // GLint texture2Location = ourShader.getUniformLocation("texture2");
   // MVP矩阵
   GLint locModel = ourShader.getUniformLocation("model");
   GLint locView = ourShader.getUniformLocation("view");
@@ -322,17 +317,17 @@ int main()
   SphereGeometry sphereGeometry(0.1, 10.0, 10.0); // 创建球体 
 
   // 纹理加载
-  unsigned int texture1, texture2;
+  unsigned int diffuseMap, specularMap;
   int width1, height1, channels1;
   int width2, height2, channels2;
   // 纹理1
-  texture1 = loadTexture("../static/texture/container.jpg", width1, height1, channels1);
+  diffuseMap = loadTexture("../static/texture/container2.png", width1, height1, channels1);
   // 设置特殊参数（仅对texture1）
-  glBindTexture(GL_TEXTURE_2D, texture1);
+  glBindTexture(GL_TEXTURE_2D, diffuseMap);
   float borderColor[] = {0.3f, 0.1f, 0.7f, 1.0f};
   glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
   // 纹理2
-  texture2 = loadTexture("../static/texture/awesomeface.png", width2, height2, channels2);
+  specularMap = loadTexture("../static/texture/container2_specular.png", width2, height2, channels2);
 
   // 渲染循环
   while (!glfwWindowShouldClose(window))
@@ -375,8 +370,8 @@ int main()
       if (ImGui::CollapsingHeader("Material property"))
       {
         ImGui::ColorEdit3("Material_AmbientColor", (float*)&materialAmbientColor);
-        ImGui::ColorEdit3("Material_DiffuseColor", (float*)&materialDiffuseColor);
-        ImGui::ColorEdit3("Material_SpecularColor", (float*)&materialSpecularColor);
+        // ImGui::ColorEdit3("Material_DiffuseColor", (float*)&materialDiffuseColor);
+        // ImGui::ColorEdit3("Material_SpecularColor", (float*)&materialSpecularColor);
         ImGui::SliderInt("Material_Shininess", &shininess, 1, 256);
       }
       
@@ -396,16 +391,16 @@ int main()
 
     ourShader.use();    
     factor = glfwGetTime();
-    ourShader.setFloat(locFactor, factor * 0.2f);
+    ourShader.setFloat(locFactor, factor * 0.01f);
 
     ourShader.setVec3(locViewPos, camera.Position);
 
-    ourShader.setInt(texture1Location, 0);
-    ourShader.setInt(texture2Location, 1);
+    // ourShader.setInt(texture1Location, 0);
+    // ourShader.setInt(texture2Location, 1);
 
     ourShader.setVec3(locMaterialAmbientColor, materialAmbientColor);
-    ourShader.setVec3(locMaterialDiffuseColor, materialDiffuseColor);
-    ourShader.setVec3(locMaterialSpecularColor, materialSpecularColor); 
+    ourShader.setInt(locMaterialDiffuseColor, materialDiffuseColor);
+    ourShader.setInt(locMaterialSpecularColor, materialSpecularColor); 
     ourShader.setFloat(locMaterialShininess, shininess);
 
     glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()), lightPosition.y, lightPosition.z);
@@ -417,9 +412,9 @@ int main()
 
     // 激活纹理单元
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture1);
+    glBindTexture(GL_TEXTURE_2D, diffuseMap);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, texture2);
+    glBindTexture(GL_TEXTURE_2D, specularMap);
 
     // 绑定VAO
     // 先绑定立方体
@@ -443,7 +438,7 @@ int main()
       // 根据位置数组来平移立方体
       model = glm::translate(model, cubePositions[i]);
       // 使用四元数让立方体自旋转
-      glm::qua<float> quat = glm::quat(glm::vec3(factor, factor, factor));
+      glm::qua<float> quat = glm::quat(glm::vec3(factor, factor, factor) * 0.5f);
       model = model * glm::mat4_cast(quat);
       ourShader.setMat4(locModel, model);
 

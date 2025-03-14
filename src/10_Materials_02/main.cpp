@@ -198,7 +198,7 @@ glm::vec3 cameraFront = camera.Front; // 相机前向
 glm::vec3 cameraUp = camera.Up; // 相机上向
 
 // 材质属性
-glm::vec3 materialAmbientColor = glm::vec3(1.0f, 0.5f, 0.31f); // 环境光颜色
+glm::vec3 materialAmbientColor = glm::vec3(1.0f, 1.0f, 1.0f); // 环境光颜色
 glm::vec3 materialDiffuseColor = glm::vec3(1.0f, 0.5f, 0.31f); // 漫反射颜色
 glm::vec3 materialSpecularColor = glm::vec3(0.5f, 0.5f, 0.5f); // 高光颜色
 int shininess = 32; // 高光指数
@@ -206,8 +206,8 @@ int shininess = 32; // 高光指数
 // 光源属性
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
 glm::vec3 lightPosition = glm::vec3(1.2f, 1.0f, 2.0f); // 光照位置
-glm::vec3 lightAmbientStrength = glm::vec3(0.2f, 0.2f, 0.2f); // 环境光强度
-glm::vec3 lightDiffuseStrength = glm::vec3(0.5f, 0.5f, 0.5f); // 漫反射强度
+glm::vec3 lightAmbientStrength = glm::vec3(0.4f, 0.4f, 0.4f); // 环境光强度
+glm::vec3 lightDiffuseStrength = glm::vec3(0.8f, 0.8f, 0.8f); // 漫反射强度
 glm::vec3 lightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 镜面反射强度
 
 // 创建多个立方体初始位置
