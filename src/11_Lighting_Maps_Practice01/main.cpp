@@ -93,8 +93,8 @@ void main() {
 
   // 漫反射纹理采样颜色
   vec3 diffuseTextureColor = vec3(texture(material.diffuseColor, outTexCoord));
-  // 高光纹理采样颜色
-  vec3 specularTextureColor = vec3(texture(material.specularColor, outTexCoord));
+  // 高光纹理采样颜色（反向处理，使得原本高光的部分变暗，暗部变为高光）
+  vec3 specularTextureColor = vec3(1.0) - vec3(texture(material.specularColor, outTexCoord));
 
   // 环境光项
   vec3 ambient = light.ambientStrength * material.ambientColor * diffuseTextureColor;
@@ -204,7 +204,7 @@ int shininess = 128; // 高光指数
 // 光源属性
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
 glm::vec3 lightPosition = glm::vec3(1.2f, 1.0f, 2.0f); // 光照位置
-glm::vec3 lightAmbientStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 环境光强度
+glm::vec3 lightAmbientStrength = glm::vec3(0.7f, 0.7f, 0.7f); // 环境光强度
 glm::vec3 lightDiffuseStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 漫反射强度
 glm::vec3 lightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 镜面反射强度
 

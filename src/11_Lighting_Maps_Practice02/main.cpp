@@ -199,12 +199,12 @@ glm::vec3 cameraUp = camera.Up; // 相机上向
 glm::vec3 materialAmbientColor = glm::vec3(1.0f, 1.0f, 1.0f); // 环境光颜色
 int materialDiffuseColor = 0; // 漫反射颜色(纹理)
 int materialSpecularColor = 1; // 高光颜色(纹理)
-int shininess = 128; // 高光指数
+int shininess = 64; // 高光指数
 
 // 光源属性
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
 glm::vec3 lightPosition = glm::vec3(1.2f, 1.0f, 2.0f); // 光照位置
-glm::vec3 lightAmbientStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 环境光强度
+glm::vec3 lightAmbientStrength = glm::vec3(0.4f, 0.4f, 0.4f); // 环境光强度
 glm::vec3 lightDiffuseStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 漫反射强度
 glm::vec3 lightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 镜面反射强度
 
@@ -330,7 +330,7 @@ int main()
   float borderColor[] = {0.3f, 0.1f, 0.7f, 1.0f};
   glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
   // 纹理2
-  specularMap = loadTexture("../static/texture/container2_specular.png", width2, height2, channels2);
+  specularMap = loadTexture("../static/texture/lighting_maps_specular_color.png", width2, height2, channels2);
 
   // 渲染循环
   while (!glfwWindowShouldClose(window))
@@ -441,7 +441,7 @@ int main()
       // 根据位置数组来平移立方体
       model = glm::translate(model, cubePositions[i]);
       // 使用四元数让立方体自旋转
-      glm::qua<float> quat = glm::quat(glm::vec3(factor, factor, factor) * 0.5f);
+      glm::qua<float> quat = glm::quat(glm::vec3(factor, factor, factor) * 0.3f);
       model = model * glm::mat4_cast(quat);
       ourShader.setMat4(locModel, model);
 
