@@ -120,9 +120,12 @@ void main() {
 
   // 聚光灯
   vec3 spotLightDirection = normalize(-light.direction); // 光源方向
-  float theta = dot(lightDir, spotLightDirection); // 是cos值，着色点到光源的向量与光源方向的夹角余弦值
+  float theta = dot(lightDir, spotLightDirection); // 是cos值，为实际着色点与光源方向的夹角余弦值
   float Phi = cos(light.cutOff); // 是cos值，切光角cos值
-  bool isInnerLight = theta > Phi; // cos值越大，角度越小。theta > Phi 说明在聚光灯的内部
+  float Phi_outer = cos(light.outerCutOff); // 是cos值，外切光角cos值
+  float epsilon = Phi - Phi_outer; // 是cos值，内切光角与外切光角的差值
+  // 使用clamp函数，将intensity限制在0.0到1.0之间，就可以不用if-else判断了
+  float intensity = clamp((theta - Phi_outer) / epsilon, 0.0, 1.0); // 是cos值，内切光角与外切光角的差值
 
   // 环境光项
   vec3 ambient = light.ambientStrength * material.ambientColor * diffuseTextureColor;
@@ -141,6 +144,10 @@ void main() {
   float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
   vec3 specular = light.specularStrength * spec * specularTextureColor;
 
+  // 聚光灯软化边缘
+  diffuse *= intensity;
+  specular *= intensity;
+
   // 衰减项
   float attenuation = 1.0 / (light.attenuationConstant + light.attenuationLinear * distanceToLight + 
                   light.attenuationQuadratic * (distanceToLight * distanceToLight));
@@ -152,25 +159,19 @@ void main() {
   vec3 result;
 
   // 仅环境光项
-  // vec3 result = ambient * vec3(objectColor); 
+  // result = ambient * vec3(objectColor); 
 
   // 仅漫反射项
-  // vec3 result = diffuse * vec3(objectColor);
+  // result = diffuse * vec3(objectColor);
 
   // 仅镜面光项
-  // vec3 result = specular * vec3(objectColor);
+  // result = specular * vec3(objectColor);
 
   // 环境光+漫反射+镜面光
-  // vec3 result = (ambient + diffuse + specular) * vec3(objectColor) * light.color;
+  // result = (ambient + diffuse + specular) * vec3(objectColor) * light.color;
   
   // 聚光灯
-  if (isInnerLight) {
-    // 执行光照计算
-    result = (ambient + diffuse + specular) * vec3(objectColor) * light.color;
-  } else {
-    // 否则，使用环境光，让场景在聚光之外时不至于完全黑暗
-    result = ambient * vec3(objectColor) * light.color;
-  }
+  result = (ambient + diffuse + specular) * vec3(objectColor) * light.color;
 
   // 最终颜色
   FragColor = vec4(result, 1.0);
