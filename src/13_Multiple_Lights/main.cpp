@@ -60,8 +60,8 @@ const char *fragmentShaderSource =  R"(
 // 定义材质结构体，材质在各光照条件下的颜色情况
 struct Material{
   vec3 ambientColor; // 环境光颜色
-  sampler2D diffuseColor; // 漫反射颜色(纹理)
-  sampler2D specularColor; // 高光颜色(纹理)
+  sampler2D diffuseMap; // 漫反射颜色(纹理)
+  sampler2D specularMap; // 高光颜色(纹理)
   float shininess; // 高光指数
 };
 
@@ -82,15 +82,15 @@ struct PointLight {
   vec3 position;
   vec3 color;
 
-  // 点光源衰减项参数
-  float attenuationConstant; // 衰减常数项
-  float attenuationLinear; // 衰减一次项
-  float attenuationQuadratic; // 衰减二次项
-
   // 光强度属性
   vec3 ambientStrength; // 环境光强度
   vec3 diffuseStrength; // 漫反射强度
   vec3 specularStrength; // 镜面反射强度
+
+  // 点光源衰减项参数
+  float attenuationConstant; // 衰减常数项
+  float attenuationLinear; // 衰减一次项
+  float attenuationQuadratic; // 衰减二次项
 };
 
 // 聚光灯
@@ -103,15 +103,15 @@ struct SpotLight {
   float cutOff; // 聚光灯的切光角，是cos值
   float outerCutOff; // 聚光灯的外切光角，是cos值  
 
-  // 点光源衰减项参数
-  float attenuationConstant; // 衰减常数项
-  float attenuationLinear; // 衰减一次项
-  float attenuationQuadratic; // 衰减二次项
-
   // 光强度属性
   vec3 ambientStrength; // 环境光强度
   vec3 diffuseStrength; // 漫反射强度
   vec3 specularStrength; // 镜面反射强度
+
+  // 点光源衰减项参数
+  float attenuationConstant; // 衰减常数项
+  float attenuationLinear; // 衰减一次项
+  float attenuationQuadratic; // 衰减二次项
 };
 
 #define NR_POINT_LIGHTS 4
@@ -158,8 +158,10 @@ void main() {
   for(int i = 0; i < NR_POINT_LIGHTS; i++) {
     result += CalcPointLight(pointLights[i], normal, outFragPos, viewDir);
   }
+
   // 聚光光源
-  result += CalcSpotLight(spotLight, normal, outFragPos, viewDir) * texture(awesomeMap, outTexCoord).rgb;
+  result += CalcSpotLight(spotLight, normal, outFragPos, viewDir) 
+            * vec3(texture(awesomeMap, outTexCoord));
 
   // 与物体自身颜色相乘
   result = result * vec3(objectColor);
@@ -173,9 +175,9 @@ void main() {
 vec3 CalcDirectionLight(DirectionLight light, vec3 normal, vec3 viewDir) {
   // 纹理颜色采样
   // 漫反射纹理采样颜色
-  vec3 diffuseTextureColor = vec3(texture(material.diffuseColor, outTexCoord));
+  vec3 diffuseTextureColor = vec3(texture(material.diffuseMap, outTexCoord));
   // 高光纹理采样颜色
-  vec3 specularTextureColor = vec3(texture(material.specularColor, outTexCoord));
+  vec3 specularTextureColor = vec3(texture(material.specularMap, outTexCoord));
 
   // 环境光项
   vec3 ambient = light.ambientStrength * diffuseTextureColor;
@@ -199,9 +201,9 @@ vec3 CalcDirectionLight(DirectionLight light, vec3 normal, vec3 viewDir) {
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
   // 纹理颜色采样
   // 漫反射纹理采样颜色
-  vec3 diffuseTextureColor = vec3(texture(material.diffuseColor, outTexCoord));
+  vec3 diffuseTextureColor = vec3(texture(material.diffuseMap, outTexCoord));
   // 高光纹理采样颜色
-  vec3 specularTextureColor = vec3(texture(material.specularColor, outTexCoord));
+  vec3 specularTextureColor = vec3(texture(material.specularMap, outTexCoord));
 
   // 环境光项
   vec3 ambient = light.ambientStrength * diffuseTextureColor;
@@ -225,16 +227,16 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
   specular *= attenuation;
 
   // 环境光+漫反射+镜面光
-  return (ambient + diffuse + specular);
+  return (ambient + diffuse + specular) * light.color;
 }
 
 // 计算聚光灯（参数：聚光灯结构体，法线，片元位置，视线方向）
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
   // 纹理颜色采样
   // 漫反射纹理采样颜色
-  vec3 diffuseTextureColor = vec3(texture(material.diffuseColor, outTexCoord));
+  vec3 diffuseTextureColor = vec3(texture(material.diffuseMap, outTexCoord));
   // 高光纹理采样颜色
-  vec3 specularTextureColor = vec3(texture(material.specularColor, outTexCoord));
+  vec3 specularTextureColor = vec3(texture(material.specularMap, outTexCoord));
 
   // 环境光项
   vec3 ambient = light.ambientStrength * diffuseTextureColor;
@@ -298,8 +300,10 @@ const char *light_object_frag = R"(
 out vec4 FragColor;
 in vec2 outTexCoord;
 
+uniform vec3 lightColor;
+
 void main() {
-  FragColor = vec4(1);
+  FragColor = vec4(lightColor, 1.0f);
 }
 )";
 
@@ -342,8 +346,9 @@ glm::vec3 cameraUp = camera.Up; // 相机上向
 
 // 材质属性
 glm::vec3 materialAmbientColor = glm::vec3(1.0f, 0.5f, 0.31f);
-int materialDiffuseColor = 0; // 漫反射颜色(纹理)
-int materialSpecularColor = 1; // 高光颜色(纹理)
+int materialDiffuseMap = 0; // 漫反射颜色(纹理)
+int materialSpecularMap = 1; // 高光颜色(纹理)
+int materialAwesomeMap = 2; // 聚光灯颜色(纹理)
 int shininess = 128; // 高光指数
 
 // 光源属性（初始值）
@@ -351,11 +356,14 @@ glm::vec3 lightPosition = glm::vec3(0.0, 0.0, -2.0); // 光照位置
 glm::vec3 lightDirection = glm::vec3(0.0, 0.0, -1.0); // 光照方向
 glm::vec3 parallelLightDirection = glm::vec3(0.0, 0.0, -1.0); // 平行光方向
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
-float cutOff = glm::radians(12.5f); // 聚光灯的切光角
-float outerCutOff = glm::radians(17.5f); // 聚光灯的外切光角
-glm::vec3 lightAmbientStrength = glm::vec3(0.1f, 0.1f, 0.1f); // 环境光强度
-glm::vec3 lightDiffuseStrength = glm::vec3(0.9f, 0.9f, 0.9f); // 漫反射强度
+float cutOff = glm::cos(glm::radians(12.5f)); // 聚光灯的切光角，cos值
+float outerCutOff = glm::cos(glm::radians(17.5f)); // 聚光灯的外切光角，cos值
+glm::vec3 lightAmbientStrength = glm::vec3(0.05f, 0.05f, 0.05f); // 环境光强度
+glm::vec3 lightDiffuseStrength = glm::vec3(0.8f, 0.8f, 0.8f); // 漫反射强度
 glm::vec3 lightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 镜面反射强度
+glm::vec3 spotLightAmbientStrength = glm::vec3(0.0f, 0.0f, 0.0f); // 聚光灯环境光强度
+glm::vec3 spotLightDiffuseStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 聚光灯漫反射强度
+glm::vec3 spotLightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 聚光灯镜面反射强度
 float lightAttenuationConstant = 1.0f; // 衰减常数项，常数项一般都是1.0
 float lightAttenuationLinear = 0.09f; // 衰减一次项，对应50m距离
 float lightAttenuationQuadratic = 0.032f; // 衰减二次项，对应50m距离
@@ -373,6 +381,19 @@ glm::vec3 cubePositions[] = {
     glm::vec3( 1.5f,  0.2f, -1.5f), 
     glm::vec3(-1.3f,  1.0f, -1.5f)  
   };
+
+// 点光源的位置
+glm::vec3 pointLightPositions[] = {
+    glm::vec3(0.7f, 0.2f, 1.5f),
+    glm::vec3(2.3f, -3.3f, -4.0f),
+    glm::vec3(-4.0f, 2.0f, -12.0f),
+    glm::vec3(0.0f, 0.0f, -3.0f)};
+
+glm::vec3 pointLightColors[] = {
+    glm::vec3(1.0f, 1.0f, 1.0f),
+    glm::vec3(1.0f, 0.0f, 1.0f),
+    glm::vec3(0.0f, 0.0f, 1.0f),
+    glm::vec3(0.0f, 1.0f, 0.0f)};
 
 using namespace std;
 
@@ -439,33 +460,63 @@ int main()
   // 物体着色器：
   // 时间因子
   GLint locFactor = ourShader.getUniformLocation("factor");
-  // // 纹理参数
-  // GLint texture1Location = ourShader.getUniformLocation("texture1");
-  // GLint texture2Location = ourShader.getUniformLocation("texture2");
+
   // MVP矩阵
   GLint locModel = ourShader.getUniformLocation("model");
   GLint locView = ourShader.getUniformLocation("view");
   GLint locProjection = ourShader.getUniformLocation("projection");
+  
   // 相机位置
   GLint locViewPos = ourShader.getUniformLocation("viewPos");
-  // 材质属性位置
+  
+  // 材质纹理属性位置
   GLint locMaterialAmbientColor = ourShader.getUniformLocation("material.ambientColor");
-  GLint locMaterialDiffuseColor = ourShader.getUniformLocation("material.diffuseColor");
-  GLint locMaterialSpecularColor = ourShader.getUniformLocation("material.specularColor");
+  GLint locMaterialDiffuseMap = ourShader.getUniformLocation("material.diffuseMap");
+  GLint locMaterialSpecularMap = ourShader.getUniformLocation("material.specularMap");
+  GLint locAwesomeMap = ourShader.getUniformLocation("awesomeMap");
   GLint locMaterialShininess = ourShader.getUniformLocation("material.shininess");
-  // 光源属性位置
-  GLint locLightPos = ourShader.getUniformLocation("light.position");
-  GLint locLightDirection = ourShader.getUniformLocation("light.direction");
-  GLint locLightColor = ourShader.getUniformLocation("light.color");
-  GLint locParallelLightDirection = ourShader.getUniformLocation("light.parallelLightDirection");
-  GLint locCutOff = ourShader.getUniformLocation("light.cutOff");
-  GLint locOuterCutOff = ourShader.getUniformLocation("light.outerCutOff");
-  GLint locLightAmbientStrength = ourShader.getUniformLocation("light.ambientStrength");
-  GLint locLightDiffuseStrength = ourShader.getUniformLocation("light.diffuseStrength");
-  GLint locLightSpecularStrength = ourShader.getUniformLocation("light.specularStrength");
-  GLint locLightAttenuationConstant = ourShader.getUniformLocation("light.attenuationConstant");
-  GLint locLightAttenuationLinear = ourShader.getUniformLocation("light.attenuationLinear");
-  GLint locLightAttenuationQuadratic = ourShader.getUniformLocation("light.attenuationQuadratic");
+  
+  // 平行光源属性位置
+  GLint locDirectionLightColor = ourShader.getUniformLocation("directionLight.color");
+  GLint locDirectionLightDirection = ourShader.getUniformLocation("directionLight.parallelLightDirection");
+  GLint locDirectionLightAmbientStrength = ourShader.getUniformLocation("directionLight.ambientStrength");
+  GLint locDirectionLightDiffuseStrength = ourShader.getUniformLocation("directionLight.diffuseStrength");
+  GLint locDirectionLightSpecularStrength = ourShader.getUniformLocation("directionLight.specularStrength");
+
+  // 点光源属性位置
+  vector<GLint> locPointLightPosition;
+  vector<GLint> locPointLightColor;
+  vector<GLint> locPointLightAmbientStrength;
+  vector<GLint> locPointLightDiffuseStrength;
+  vector<GLint> locPointLightSpecularStrength;
+  vector<GLint> locPointLightAttenuationConstant;
+  vector<GLint> locPointLightAttenuationLinear;
+  vector<GLint> locPointLightAttenuationQuadratic;
+  for (unsigned int i = 0; i < 4; i++)
+  {
+    locPointLightPosition.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].position"));
+    locPointLightColor.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].color"));
+    locPointLightAmbientStrength.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].ambientStrength"));
+    locPointLightDiffuseStrength.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].diffuseStrength"));
+    locPointLightSpecularStrength.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].specularStrength"));
+    locPointLightAttenuationConstant.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].attenuationConstant"));
+    locPointLightAttenuationLinear.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].attenuationLinear"));
+    locPointLightAttenuationQuadratic.push_back(ourShader.getUniformLocation("pointLights[" + to_string(i) + "].attenuationQuadratic")); 
+  }
+
+  // 聚光灯属性位置
+  GLint locSpotLightPosition = ourShader.getUniformLocation("spotLight.position");
+  GLint locSpotLightDirection = ourShader.getUniformLocation("spotLight.direction");
+  GLint locSpotLightColor = ourShader.getUniformLocation("spotLight.color");
+  GLint locSpotLightCutOff = ourShader.getUniformLocation("spotLight.cutOff");
+  GLint locSpotLightOuterCutOff = ourShader.getUniformLocation("spotLight.outerCutOff");
+  GLint locSpotLightAmbientStrength = ourShader.getUniformLocation("spotLight.ambientStrength");
+  GLint locSpotLightDiffuseStrength = ourShader.getUniformLocation("spotLight.diffuseStrength");
+  GLint locSpotLightSpecularStrength = ourShader.getUniformLocation("spotLight.specularStrength");
+  GLint locSpotLightAttenuationConstant = ourShader.getUniformLocation("spotLight.attenuationConstant");
+  GLint locSpotLightAttenuationLinear = ourShader.getUniformLocation("spotLight.attenuationLinear");
+  GLint locSpotLightAttenuationQuadratic = ourShader.getUniformLocation("spotLight.attenuationQuadratic");
+  
 
   // 灯光物体着色器：
   // MVP矩阵位置
@@ -479,9 +530,10 @@ int main()
   SphereGeometry sphereGeometry(0.1, 10.0, 10.0); // 创建球体 
 
   // 纹理加载
-  unsigned int diffuseMap, specularMap;
+  unsigned int diffuseMap, specularMap, awesomeMap;
   int width1, height1, channels1;
   int width2, height2, channels2;
+  int width3, height3, channels3;
   // 纹理1
   diffuseMap = loadTexture("../static/texture/container2.png", width1, height1, channels1);
   // 设置特殊参数（仅对texture1）
@@ -490,6 +542,8 @@ int main()
   glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
   // 纹理2
   specularMap = loadTexture("../static/texture/container2_specular.png", width2, height2, channels2);
+  // 纹理3
+  awesomeMap = loadTexture("../static/texture/awesomeface.png", width3, height3, channels3);
 
   // 渲染循环
   while (!glfwWindowShouldClose(window))
@@ -533,8 +587,8 @@ int main()
       if (ImGui::CollapsingHeader("Material property"))
       {
         ImGui::ColorEdit3("Material_AmbientColor", (float*)&materialAmbientColor);
-        // ImGui::ColorEdit3("Material_DiffuseColor", (float*)&materialDiffuseColor);
-        // ImGui::ColorEdit3("Material_SpecularColor", (float*)&materialSpecularColor);
+        // ImGui::ColorEdit3("Material_DiffuseColor", (float*)&materialDiffuseMap);
+        // ImGui::ColorEdit3("Material_SpecularColor", (float*)&materialSpecularMap);
         ImGui::SliderInt("Material_Shininess", &shininess, 1, 256);
       }
       
@@ -560,34 +614,53 @@ int main()
 
     // 材质属性传入着色器中
     ourShader.setVec3(locMaterialAmbientColor, materialAmbientColor);
-    ourShader.setInt(locMaterialDiffuseColor, materialDiffuseColor);
-    ourShader.setInt(locMaterialSpecularColor, materialSpecularColor); 
+    ourShader.setInt(locMaterialDiffuseMap, materialDiffuseMap);
+    ourShader.setInt(locMaterialSpecularMap, materialSpecularMap); 
+    ourShader.setInt(locAwesomeMap, materialAwesomeMap);
     ourShader.setFloat(locMaterialShininess, shininess);
 
-    // 光源属性传入着色器中
+    // 平行光源属性传入着色器中
+    // 设置平行光源位置，沿着x轴往返运动
     glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()), lightPosition.y, lightPosition.z);
-    ourShader.setVec3(locLightPos, cameraPos);
-    ourShader.setVec3(locLightDirection, cameraFront);
-    // 重要：平行光方向（也就是光照方向，只是不需要计算每一个着色点指向光源的向量了，直接使用光照方向，因为平行光的光源方向是固定的，所有着色点都使用同一个光照方向）
-    ourShader.setVec3(locParallelLightDirection, lightPos);
-    ourShader.setVec3(locLightColor, lightColor);
-    // 聚光灯属性传入着色器中
-    ourShader.setFloat(locCutOff, cutOff);
-    ourShader.setFloat(locOuterCutOff, outerCutOff);
-    // 光强度属性传入着色器中
-    ourShader.setVec3(locLightAmbientStrength, lightAmbientStrength);  // 环境光强度
-    ourShader.setVec3(locLightDiffuseStrength, lightDiffuseStrength);  // 漫反射强度
-    ourShader.setVec3(locLightSpecularStrength, lightSpecularStrength); // 镜面反射强度
-    // 衰减属性传入着色器中
-    ourShader.setFloat(locLightAttenuationConstant, lightAttenuationConstant); // 衰减常数项
-    ourShader.setFloat(locLightAttenuationLinear, lightAttenuationLinear); // 衰减一次项
-    ourShader.setFloat(locLightAttenuationQuadratic, lightAttenuationQuadratic); // 衰减二次项
+    ourShader.setVec3(locDirectionLightDirection, lightPos);
+    ourShader.setVec3(locDirectionLightColor, lightColor);
+    ourShader.setVec3(locDirectionLightAmbientStrength, lightAmbientStrength);
+    ourShader.setVec3(locDirectionLightDiffuseStrength, lightDiffuseStrength);
+    ourShader.setVec3(locDirectionLightSpecularStrength, lightSpecularStrength);
 
+    // 点光源属性传入着色器中
+    for (unsigned int i = 0; i < 4; i++)
+    {
+      ourShader.setVec3(locPointLightPosition[i], pointLightPositions[i]);
+      ourShader.setVec3(locPointLightColor[i], pointLightColors[i]);
+      ourShader.setFloat(locPointLightAttenuationConstant[i], lightAttenuationConstant);
+      ourShader.setFloat(locPointLightAttenuationLinear[i], lightAttenuationLinear);
+      ourShader.setFloat(locPointLightAttenuationQuadratic[i], lightAttenuationQuadratic);
+      ourShader.setVec3(locPointLightAmbientStrength[i], lightAmbientStrength);
+      ourShader.setVec3(locPointLightDiffuseStrength[i], lightDiffuseStrength);
+      ourShader.setVec3(locPointLightSpecularStrength[i], lightSpecularStrength);
+    }
+    
+    // 聚光灯属性传入着色器中
+    ourShader.setVec3(locSpotLightPosition, cameraPos);
+    ourShader.setVec3(locSpotLightDirection, cameraFront);
+    ourShader.setVec3(locSpotLightColor, lightColor);
+    ourShader.setFloat(locSpotLightCutOff, cutOff);
+    ourShader.setFloat(locSpotLightOuterCutOff, outerCutOff);
+    ourShader.setVec3(locSpotLightAmbientStrength, spotLightAmbientStrength);
+    ourShader.setVec3(locSpotLightDiffuseStrength, spotLightDiffuseStrength);
+    ourShader.setVec3(locSpotLightSpecularStrength, spotLightSpecularStrength);
+    ourShader.setFloat(locSpotLightAttenuationConstant, lightAttenuationConstant);
+    ourShader.setFloat(locSpotLightAttenuationLinear, lightAttenuationLinear);
+    ourShader.setFloat(locSpotLightAttenuationQuadratic, lightAttenuationQuadratic);
+   
     // 激活纹理单元，并绑定纹理
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, diffuseMap);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, specularMap);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, awesomeMap);
 
     // 绑定VAO
     // 先绑定立方体
@@ -603,7 +676,7 @@ int main()
     projection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
     ourShader.setMat4(locProjection, projection);
 
-    // 设置立方体位置
+    // 设置10个立方体位置
     for(unsigned int i = 0; i < sizeof(cubePositions) / sizeof(cubePositions[0]); i++)
     {
       // 创建模型矩阵
@@ -620,13 +693,46 @@ int main()
     }
 
     // 绘制灯光物体
-    lightObjectShader.use();
-    glm::mat4 lightModel = glm::mat4(1.0f);
-    lightModel = glm::translate(lightModel, cameraPos); // 移动到设置好的灯光位置
-    lightObjectShader.setMat4(locLightModel, lightModel);
+    // 使用灯光物体着色器
+    lightObjectShader.use(); 
     lightObjectShader.setMat4(locLightView, view);
     lightObjectShader.setMat4(locLightProjection, projection);
+
+    // 绘制平行光源
+    // 创建灯光物体模型矩阵
+    glm::mat4 lightModel = glm::mat4(1.0f);
+    // 设置平行光源位置
+    lightModel = glm::translate(lightModel, lightPos);
+    lightObjectShader.setMat4(locLightModel, lightModel);
+    lightObjectShader.setVec3("lightColor", lightColor);
     glBindVertexArray(sphereGeometry.VAO);
+    glDrawElements(GL_TRIANGLES, sphereGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+
+    // 绘制点光源
+    for (unsigned int i = 0; i < 4; i++)
+    {
+      glm::mat4 model = glm::mat4(1.0f);
+      model = glm::translate(model, pointLightPositions[i]);
+
+      lightObjectShader.setMat4("model", model);
+      lightObjectShader.setVec3("lightColor", pointLightColors[i]);
+
+      // 绑定VAO
+      glBindVertexArray(sphereGeometry.VAO);
+      // 绘制
+      glDrawElements(GL_TRIANGLES, sphereGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    }
+
+    // 绘制聚光灯
+    // 创建聚光灯模型矩阵
+    glm::mat4 spotLightModel = glm::mat4(1.0f);
+    // 设置聚光灯位置
+    spotLightModel = glm::translate(spotLightModel, cameraPos);
+    lightObjectShader.setMat4("model", spotLightModel);
+    lightObjectShader.setVec3("lightColor", lightColor);
+    // 绑定VAO
+    glBindVertexArray(sphereGeometry.VAO);
+    // 绘制
     glDrawElements(GL_TRIANGLES, sphereGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
     // 渲染ImGui部分
