@@ -543,7 +543,10 @@ int main()
   // 纹理2
   specularMap = loadTexture("../static/texture/container2_specular.png", width2, height2, channels2);
   // 纹理3
+  // 加载awesomeMap时临时翻转，添加垂直翻转操作
+  stbi_set_flip_vertically_on_load(true);
   awesomeMap = loadTexture("../static/texture/awesomeface.png", width3, height3, channels3);
+  stbi_set_flip_vertically_on_load(false); // 恢复默认
 
   // 渲染循环
   while (!glfwWindowShouldClose(window))
