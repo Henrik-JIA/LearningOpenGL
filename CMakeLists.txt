@@ -22,7 +22,7 @@ file(GLOB SOURCES
 
 # 添加可执行文件
 add_executable(
-    main src/12_Light_Casters_04/main.cpp
+    main src/13_Multiple_Lights/main.cpp
     ${SOURCES}
 )
 
