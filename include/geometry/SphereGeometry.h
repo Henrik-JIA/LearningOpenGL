@@ -22,7 +22,7 @@ public:
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 normal = glm::vec3(0.0f);
 
-    Vertex vertex;
+    VertexProperty vertex;
 
     // 计算 vertices normals 和 uvs
     for (unsigned int iy = 0; iy <= heightSegments; iy++)

@@ -20,7 +20,7 @@ using namespace std;
 const float PI = glm::pi<float>();
 
 // mesh.h中也定义此属性
-struct Vertex
+struct VertexProperty
 {
     glm::vec3 Position;  // 顶点位置
     glm::vec3 Normal;    // 法线
@@ -34,7 +34,7 @@ struct Vertex
 class BufferGeometry
 {
 public:
-    vector<Vertex> vertices; // 顶点数据
+    vector<VertexProperty> vertices; // 顶点数据
     vector<unsigned int> indices; // 索引数据
     unsigned int VAO; // 顶点数组对象
 
@@ -87,7 +87,7 @@ protected:
         // 绑定VBO到顶点缓冲目标
         glBindBuffer(GL_ARRAY_BUFFER, VBO); 
         // 将CPU的vertices数组数据复制到GPU的VBO中
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(VertexProperty), &vertices[0], GL_DYNAMIC_DRAW);
 
         // 绑定EBO到索引缓冲目标
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -105,27 +105,27 @@ protected:
             (void *)0：起始偏移量
         */
         // Position 位置
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexProperty), (void *)0);
         glEnableVertexAttribArray(0); // 启用顶点属性位置0，0表示glsl中的layout(location=0)
 
         // Normal 法线
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Normal));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexProperty), (void *)offsetof(VertexProperty, Normal));
         glEnableVertexAttribArray(2);
 
         // TexCoords 纹理坐标   
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, TexCoords));
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexProperty), (void *)offsetof(VertexProperty, TexCoords));
         glEnableVertexAttribArray(3);
 
         // Color 颜色
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Color));
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(VertexProperty), (void *)offsetof(VertexProperty, Color));
         glEnableVertexAttribArray(1);
 
         // Tangent 切线
-        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Tangent));
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(VertexProperty), (void *)offsetof(VertexProperty, Tangent));
         glEnableVertexAttribArray(4);
 
         // Bitangent 副切线
-        glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Bitangent));
+        glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(VertexProperty), (void *)offsetof(VertexProperty, Bitangent));
         glEnableVertexAttribArray(5);
         
         // 解绑顶点缓冲对象和顶点数组对象

@@ -36,7 +36,7 @@ public:
         float segment_height = height / hSegment;
 
         // 创建顶点，这里顶点结构体是继承于BufferGeometry中的结构体
-        Vertex vertex;
+        VertexProperty vertex;
 
         // 生成顶点位置、法向量、纹理坐标
         // 遍历每个网格

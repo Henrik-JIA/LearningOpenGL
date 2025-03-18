@@ -10,7 +10,7 @@ add_compile_options(-Wall -Wextra -g)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/output)
 
 # 包含头文件目录
-include_directories(include)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # 添加库目录
 link_directories(lib)
@@ -22,7 +22,7 @@ file(GLOB SOURCES
 
 # 添加可执行文件
 add_executable(
-    main src/13_Multiple_Lights/main.cpp
+    main src/14_Model/main.cpp
     ${SOURCES}
 )
 
@@ -34,7 +34,6 @@ target_link_libraries(main
     glad
     glfw3dll
     opengl32
-    assimp
 )
 
 # 添加清理目标

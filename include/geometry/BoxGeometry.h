@@ -98,7 +98,7 @@ private:
         glm::vec3 vector = glm::vec3(0.0f, 0.0f, 0.0f);
 
         // 创建顶点
-        Vertex vertex;
+        VertexProperty vertex;
 
         // 生成 顶点数据
         for (unsigned int iy = 0; iy < gridY1; iy++)

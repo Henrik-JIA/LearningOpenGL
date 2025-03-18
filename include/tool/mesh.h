@@ -6,11 +6,21 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <tool/shader.h>
+#include <tool/OBJ_Loader.h>
 
 #include <string>
 #include <vector>
 
 using namespace std;
+
+// 添加数据转换适配器
+inline glm::vec3 ToGlmVec3(const objl::Vector3& v) {
+    return glm::vec3(v.X, v.Y, v.Z);
+}
+
+inline glm::vec2 ToGlmVec2(const objl::Vector2& v) {
+    return glm::vec2(v.X, v.Y);
+}
 
 #ifndef BUFFER_GROMETRY
 struct Vertex
@@ -50,6 +60,30 @@ public:
 		// now that we have all the required data, set the vertex buffers and its attribute pointers.
 		setupMesh();
 	}
+
+    // 新增构造函数：从objl::Mesh转换
+    Mesh(const objl::Mesh& objMesh, const std::string& basePath = "") 
+    {
+        // 转换顶点数据
+        for (auto& v : objMesh.Vertices) {
+            Vertex vert;
+            vert.Position = ToGlmVec3(v.Position);
+            vert.Normal = ToGlmVec3(v.Normal);
+            vert.TexCoords = ToGlmVec2(v.TextureCoordinate);
+            vert.Tangent = ToGlmVec3(v.Tangent);
+            vert.Bitangent = ToGlmVec3(v.Bitangent);
+            this->vertices.push_back(vert);
+        }
+
+        // 直接复制索引
+        this->indices = objMesh.Indices;
+
+        // 转换材质到纹理
+        LoadTexturesFromMaterial(objMesh.MeshMaterial, basePath);
+
+        setupMesh();
+    }
+
 	// render the mesh
 	void Draw(Shader &shader)
 	{
@@ -128,6 +162,61 @@ private:
 		glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Bitangent));
 
 		glBindVertexArray(0);
+	}
+
+    // 新增材质到纹理的转换方法
+    void LoadTexturesFromMaterial(const objl::Material& mat, const std::string& basePath) {
+        auto loadTex = [&](const std::string& path, const std::string& type) {
+            if (!path.empty()) {
+                Texture tex;
+                tex.id = this->TextureFromFile(path, basePath); // 需要实现纹理加载函数
+                tex.type = type;
+                tex.path = path;
+                textures.push_back(tex);
+            }
+        };
+
+        loadTex(mat.map_Kd, "texture_diffuse");
+        loadTex(mat.map_Ks, "texture_specular");
+        loadTex(mat.map_bump, "texture_normal");
+        loadTex(mat.map_Ka, "texture_ambient");
+    }
+
+	int TextureFromFile(const std::string& path, const std::string& directory) 
+	{
+		std::string filename = directory + '/' + path;
+		
+		unsigned int textureID;
+		glGenTextures(1, &textureID);
+		
+		int width, height, nrComponents;
+		unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+		if (data)
+		{
+			// ... 保持原有纹理加载逻辑 ...
+			GLenum format = GL_RGB;
+            if (nrComponents == 1)
+                format = GL_RED;
+            else if (nrComponents == 3)
+                format = GL_RGB;
+            else if (nrComponents == 4)
+                format = GL_RGBA;
+
+            glBindTexture(GL_TEXTURE_2D, textureID);
+            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		}
+		else
+		{
+			std::cout << "Texture failed to load at path: " << path << std::endl;
+		}
+		stbi_image_free(data);
+		return textureID;
 	}
 };
 
