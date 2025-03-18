@@ -194,7 +194,7 @@ vec3 CalcDirectionLight(DirectionLight light, vec3 normal, vec3 viewDir) {
   vec3 specular = light.specularStrength * spec * specularTextureColor;
 
   // 环境光+漫反射+镜面光
-  return ambient + diffuse + specular;
+  return ambient + diffuse + specular * light.color;
 }
 
 // 计算点光源（参数：点光源结构体，法线，片元位置，视线方向）
@@ -273,7 +273,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
   specular *= intensity;
   
   // 环境光+漫反射+镜面光
-  return (ambient + diffuse + specular);
+  return (ambient + diffuse + specular) * light.color;
 }
 
 )";
@@ -352,10 +352,12 @@ int materialAwesomeMap = 2; // 聚光灯颜色(纹理)
 int shininess = 128; // 高光指数
 
 // 光源属性（初始值）
-glm::vec3 lightPosition = glm::vec3(0.0, 0.0, -2.0); // 光照位置
+// glm::vec3 lightPosition = glm::vec3(0.0, 0.0, -2.0); // 光照位置
+glm::vec3 lightPosition = glm::vec3(1.2f, 1.0f, 2.0f); // 光照位置
 glm::vec3 lightDirection = glm::vec3(0.0, 0.0, -1.0); // 光照方向
 glm::vec3 parallelLightDirection = glm::vec3(0.0, 0.0, -1.0); // 平行光方向
-glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
+// glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
+glm::vec3 lightColor = glm::vec3(1.0f, 0.5f, 0.0f); // 光照颜色橘黄色
 float cutOff = glm::cos(glm::radians(12.5f)); // 聚光灯的切光角，cos值
 float outerCutOff = glm::cos(glm::radians(17.5f)); // 聚光灯的外切光角，cos值
 glm::vec3 lightAmbientStrength = glm::vec3(0.05f, 0.05f, 0.05f); // 环境光强度
@@ -384,7 +386,7 @@ glm::vec3 cubePositions[] = {
 
 // 点光源的位置
 glm::vec3 pointLightPositions[] = {
-    glm::vec3(0.7f, 0.2f, 1.5f),
+    glm::vec3(3.7f, 0.2f, 1.5f),
     glm::vec3(2.3f, -3.3f, -4.0f),
     glm::vec3(-4.0f, 2.0f, -12.0f),
     glm::vec3(0.0f, 0.0f, -3.0f)};
@@ -687,8 +689,8 @@ int main()
       // 根据位置数组来平移立方体
       model = glm::translate(model, cubePositions[i]);
       // 使用四元数让立方体自旋转
-      glm::qua<float> quat = glm::quat(glm::vec3(factor, factor, factor) * 0.5f);
-      model = model * glm::mat4_cast(quat);
+      // glm::qua<float> quat = glm::quat(glm::vec3(factor, factor, factor) * 0.5f);
+      // model = model * glm::mat4_cast(quat);
       ourShader.setMat4(locModel, model);
 
       // 绘制立方体
@@ -701,6 +703,10 @@ int main()
     lightObjectShader.setMat4(locLightView, view);
     lightObjectShader.setMat4(locLightProjection, projection);
 
+    // 先绑定VAO
+    // 再绑定球体
+    glBindVertexArray(sphereGeometry.VAO);
+
     // 绘制平行光源
     // 创建灯光物体模型矩阵
     glm::mat4 lightModel = glm::mat4(1.0f);
@@ -708,7 +714,7 @@ int main()
     lightModel = glm::translate(lightModel, lightPos);
     lightObjectShader.setMat4(locLightModel, lightModel);
     lightObjectShader.setVec3("lightColor", lightColor);
-    glBindVertexArray(sphereGeometry.VAO);
+
     glDrawElements(GL_TRIANGLES, sphereGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
     // 绘制点光源

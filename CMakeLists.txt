@@ -34,6 +34,7 @@ target_link_libraries(main
     glad
     glfw3dll
     opengl32
+    assimp
 )
 
 # 添加清理目标
