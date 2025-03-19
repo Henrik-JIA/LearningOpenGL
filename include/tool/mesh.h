@@ -166,20 +166,41 @@ private:
 
     // 新增材质到纹理的转换方法
     void LoadTexturesFromMaterial(const objl::Material& mat, const std::string& basePath) {
-        auto loadTex = [&](const std::string& path, const std::string& type) {
-            if (!path.empty()) {
-                Texture tex;
-                tex.id = this->TextureFromFile(path, basePath); // 需要实现纹理加载函数
-                tex.type = type;
-                tex.path = path;
-                textures.push_back(tex);
-            }
-        };
+        // 处理漫反射贴图
+        if (!mat.map_Kd.empty()) {
+            Texture diffuseTex;
+            diffuseTex.id = TextureFromFile(mat.map_Kd, basePath);
+            diffuseTex.type = "texture_diffuse";
+            diffuseTex.path = mat.map_Kd;
+            textures.push_back(diffuseTex);
+        }
 
-        loadTex(mat.map_Kd, "texture_diffuse");
-        loadTex(mat.map_Ks, "texture_specular");
-        loadTex(mat.map_bump, "texture_normal");
-        loadTex(mat.map_Ka, "texture_ambient");
+        // 处理高光贴图
+        if (!mat.map_Ks.empty()) {
+            Texture specularTex;
+            specularTex.id = TextureFromFile(mat.map_Ks, basePath);
+            specularTex.type = "texture_specular";
+            specularTex.path = mat.map_Ks;
+            textures.push_back(specularTex);
+        }
+
+        // 处理法线贴图
+        if (!mat.map_bump.empty()) {
+            Texture normalTex;
+            normalTex.id = TextureFromFile(mat.map_bump, basePath);
+            normalTex.type = "texture_normal";
+            normalTex.path = mat.map_bump;
+            textures.push_back(normalTex);
+        }
+
+        // 处理环境光贴图
+        if (!mat.map_Ka.empty()) {
+            Texture ambientTex;
+            ambientTex.id = TextureFromFile(mat.map_Ka, basePath);
+            ambientTex.type = "texture_ambient";
+            ambientTex.path = mat.map_Ka;
+            textures.push_back(ambientTex);
+        }
     }
 
 	int TextureFromFile(const std::string& path, const std::string& directory) 

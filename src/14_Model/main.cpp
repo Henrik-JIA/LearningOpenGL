@@ -556,12 +556,11 @@ int main()
       std::cout << "Failed to load model" << std::endl;
       return -1;
   }
-
   // 转换加载的网格到自定义Mesh类
   std::vector<Mesh> modelMeshes;
-  std::string modelDir = "../static/model/nanosuit/"; // 模型所在目录
+  std::string modelDir = "../static/model/nanosuit"; // 模型所在目录
   for (auto& objMesh : loader.LoadedMeshes) {
-      modelMeshes.emplace_back(objMesh, modelDir);
+      modelMeshes.push_back(Mesh(objMesh, modelDir));
   }
 
   // 渲染循环
@@ -706,7 +705,7 @@ int main()
     // 创建模型矩阵
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0.0f, -1.75f, 0.0f)); // 调整位置
-    model = glm::scale(model, glm::vec3(0.2f)); // 缩放比例调整
+    model = glm::scale(model, glm::vec3(0.01f)); // 缩放比例调整
     ourShader.setMat4(locModel, model);
 
     // 设置10个立方体位置
