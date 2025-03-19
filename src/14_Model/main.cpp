@@ -550,7 +550,19 @@ int main()
   awesomeMap = loadTexture("../static/texture/awesomeface.png", width3, height3, channels3);
 
   // 加载模型
-  // Model ourModel("../static/model/nanosuit/nanosuit.obj");
+  objl::Loader loader;
+  bool loadout = loader.LoadFile("../static/model/nanosuit/nanosuit.obj");
+  if (!loadout) {
+      std::cout << "Failed to load model" << std::endl;
+      return -1;
+  }
+
+  // 转换加载的网格到自定义Mesh类
+  std::vector<Mesh> modelMeshes;
+  std::string modelDir = "../static/model/nanosuit/"; // 模型所在目录
+  for (auto& objMesh : loader.LoadedMeshes) {
+      modelMeshes.emplace_back(objMesh, modelDir);
+  }
 
   // 渲染循环
   while (!glfwWindowShouldClose(window))
@@ -691,6 +703,12 @@ int main()
     projection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
     ourShader.setMat4(locProjection, projection);
 
+    // 创建模型矩阵
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, -1.75f, 0.0f)); // 调整位置
+    model = glm::scale(model, glm::vec3(0.2f)); // 缩放比例调整
+    ourShader.setMat4(locModel, model);
+
     // 设置10个立方体位置
     for(unsigned int i = 0; i < sizeof(cubePositions) / sizeof(cubePositions[0]); i++)
     {
@@ -706,6 +724,11 @@ int main()
       // 绘制立方体
       glDrawElements(GL_TRIANGLES, boxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     }
+
+    for (auto& mesh : modelMeshes) {
+        mesh.Draw(ourShader);
+    }
+
 
     // 绘制灯光物体
     // 使用灯光物体着色器
