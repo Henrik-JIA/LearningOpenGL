@@ -6,11 +6,20 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -g)
 
+# 设置MSYS2库路径
+set(MSYS2_PREFIX "D:/msys64/mingw64")
+# 查找Assimp库
+find_package(assimp REQUIRED)
+include_directories(${ASSIMP_INCLUDE_DIRS})
+
 # 设置输出目录
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/output)
 
 # 包含头文件目录
-include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(
+    ${CMAKE_SOURCE_DIR}/include
+    ${MSYS2_PREFIX}/include
+)
 
 # 添加库目录
 link_directories(lib)
@@ -22,18 +31,17 @@ file(GLOB SOURCES
 
 # 添加可执行文件
 add_executable(
-    main src/14_Model/main.cpp
+    main src/17_Blending/main.cpp
     ${SOURCES}
 )
-
-# 设置调试工作目录（VS Code CMake Tools需要）
-# set_target_properties(main PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/output")
 
 # 链接第三方库
 target_link_libraries(main
     glad
     glfw3dll
     opengl32
+    ${ASSIMP_LIBRARIES}
+    ${MSYS2_PREFIX}/lib/libz.dll.a
 )
 
 # 添加清理目标

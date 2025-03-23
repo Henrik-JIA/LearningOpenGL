@@ -14,6 +14,7 @@
 #include <tool/Gui.h>
 
 #include <tool/mesh.h>
+#include <tool/model.h>
 
 // 着色器代码
 const char *vertexShaderSource = R"(
@@ -458,7 +459,7 @@ int main()
   // 物体着色器
   Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource);
   // 灯光物体着色器
-  Shader lightObjectShader = Shader::FromSource(light_object_vert, light_object_frag);;
+  Shader lightObjectShader = Shader::FromSource(light_object_vert, light_object_frag);
 
   // 获取uniform变量location
   // 物体着色器：
@@ -549,19 +550,11 @@ int main()
   // 纹理3
   awesomeMap = loadTexture("../static/texture/awesomeface.png", width3, height3, channels3);
 
-  // 加载模型
-  objl::Loader loader;
-  bool loadout = loader.LoadFile("../static/model/nanosuit/nanosuit.obj");
-  if (!loadout) {
-      std::cout << "Failed to load model" << std::endl;
-      return -1;
-  }
-  // 转换加载的网格到自定义Mesh类
-  std::vector<Mesh> modelMeshes;
-  std::string modelDir = "../static/model/nanosuit"; // 模型所在目录
-  for (auto& objMesh : loader.LoadedMeshes) {
-      modelMeshes.push_back(Mesh(objMesh, modelDir));
-  }
+  // 加载第一个模型（nanosuit）
+  Model ourModel("../static/model/nanosuit/nanosuit.obj");
+
+  // 加载第二个模型（backpack加载时间）
+  Model ourModel2("../static/model/backpack/backpack.obj");
 
   // 渲染循环
   while (!glfwWindowShouldClose(window))
@@ -702,12 +695,6 @@ int main()
     projection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
     ourShader.setMat4(locProjection, projection);
 
-    // 创建模型矩阵
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, -1.75f, 0.0f)); // 调整位置
-    model = glm::scale(model, glm::vec3(0.01f)); // 缩放比例调整
-    ourShader.setMat4(locModel, model);
-
     // 设置10个立方体位置
     for(unsigned int i = 0; i < sizeof(cubePositions) / sizeof(cubePositions[0]); i++)
     {
@@ -724,10 +711,19 @@ int main()
       glDrawElements(GL_TRIANGLES, boxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     }
 
-    for (auto& mesh : modelMeshes) {
-        mesh.Draw(ourShader);
-    }
+    // 绘制第一个模型（nanosuit）
+    glm::mat4 modelMatrix = glm::mat4(1.0f);
+    modelMatrix = glm::translate(modelMatrix, glm::vec3(-1.2f, -1.3f, 2.5f));
+    modelMatrix = glm::scale(modelMatrix, glm::vec3(0.15f));
+    ourShader.setMat4(locModel, modelMatrix);
+    ourModel.Draw(ourShader);
 
+    // 绘制第二个模型（backpack）
+    glm::mat4 modelMatrix2 = glm::mat4(1.0f);
+    modelMatrix2 = glm::translate(modelMatrix2, glm::vec3(1.2f, -1.3f, 2.5f));
+    modelMatrix2 = glm::scale(modelMatrix2, glm::vec3(0.5f));
+    ourShader.setMat4(locModel, modelMatrix2);
+    ourModel2.Draw(ourShader);
 
     // 绘制灯光物体
     // 使用灯光物体着色器
