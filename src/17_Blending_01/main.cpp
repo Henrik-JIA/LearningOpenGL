@@ -50,7 +50,7 @@ void main() {
   outFragPos = vec3(model * vec4(Position, 1.0f));
 
   // 纹理坐标
-  outTexCoord = TexCoords * uvScale;
+  outTexCoord = TexCoords / uvScale;
 
   // 法线矩阵（解决不等比缩放的模型，法向量不垂直于面）
   mat3 normalMatrix = mat3(transpose(inverse(model)));
@@ -143,8 +143,10 @@ uniform float factor;
 float near = 0.1;
 float far = 100.0;
 
+uniform int objectType;
 uniform sampler2D diffuseBrickMap; // 漫反射砖块纹理
 uniform sampler2D diffuseWoodMap; // 漫反射木纹纹理
+uniform sampler2D diffuseGrassMap; // 漫反射草
 
 // 定向光计算
 vec3 CalcDirectionLight(DirectionLight light, vec3 normal, vec3 viewDir);
@@ -174,18 +176,29 @@ void main() {
   // 与物体自身颜色相乘
   result = result * vec3(objectColor);
 
-  // 砖块纹理
-  result *= texture(diffuseBrickMap, outTexCoord).rgb;
+  vec4 texMap;
+    if(objectType == 0) { // 地面
+        texMap = texture(diffuseWoodMap, outTexCoord);
+    } else if(objectType == 1) { // 砖块
+        texMap = texture(diffuseBrickMap, outTexCoord);
+    } else { // 草
+        texMap = texture(diffuseGrassMap, outTexCoord);
+    }
 
+  if(texMap.a < 0.1)
+        discard;
+  
   // 最终颜色
-  // FragColor = vec4(result, 1.0);
+  vec4 color = vec4(result, 1.0) * texMap;
+
+  FragColor = vec4(color);
 
   // 渲染深度缓冲
   // FragColor = vec4(vec3(gl_FragCoord.z), 1.0);
   
   // 线性化深度值（将深度值转换为0-1之间的值，视角越远，越接近1，场景渲染越白）
-  float depth = LinearizeDepth(gl_FragCoord.z, near, far) / far;
-  FragColor = vec4(vec3(depth), 1.0);
+  // float depth = LinearizeDepth(gl_FragCoord.z, near, far) / far;
+  // FragColor = vec4(vec3(depth), 1.0);
 
 }
 
@@ -332,13 +345,15 @@ void main() {
 }
 )";
 
+using namespace std;
+
 // 函数声明
 void framebuffer_size_callback(GLFWwindow* window, int width, int height); // 窗口大小回调函数
 void processInput(GLFWwindow *window); // 处理输入
 void mouse_callback(GLFWwindow *window, double xpos, double ypos); // 鼠标回调函数
 void mouse_button_calback(GLFWwindow *window, int button, int action, int mods); // 鼠标按钮回调函数
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset); // 滚轮回调函数
-unsigned int loadTexture(const char* path, int& outWidth, int& outHeight, int& outChannels); // 加载纹理
+unsigned int loadTexture(const char* path, int& outWidth, int& outHeight, int& outChannels, GLint wrapS = GL_REPEAT, GLint wrapT = GL_REPEAT); // 加载纹理
 
 // 屏幕宽高
 int SCREEN_WIDTH = 800;
@@ -387,7 +402,7 @@ glm::vec3 parallelLightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 镜面
 
 // 点光源
 glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 光照颜色
-glm::vec3 lightAmbientStrength = glm::vec3(0.01f, 0.01f, 0.01f); // 环境光强度
+glm::vec3 lightAmbientStrength = glm::vec3(0.5f, 0.5f, 0.5f); // 环境光强度
 glm::vec3 lightDiffuseStrength = glm::vec3(0.8f, 0.8f, 0.8f); // 漫反射强度
 glm::vec3 lightSpecularStrength = glm::vec3(1.0f, 1.0f, 1.0f); // 镜面反射强度
 float lightAttenuationConstant = 1.0f; // 衰减常数项，常数项一般都是1.0
@@ -419,7 +434,13 @@ glm::vec3 pointLightColors[] = {
     glm::vec3(0.0f, 0.0f, 1.0f),
     glm::vec3(0.0f, 1.0f, 0.0f)};
 
-using namespace std;
+// 草的位置
+vector<glm::vec3> grassPositions{
+      glm::vec3(-1.5f, 0.5f, -0.48f),
+      glm::vec3(1.5f, 0.5f, 0.51f),
+      glm::vec3(0.0f, 0.5f, 0.7f),
+      glm::vec3(-0.3f, 0.5f, -2.3f),
+      glm::vec3(0.5f, 0.5f, -0.6f)};
 
 int main()
 {
@@ -478,6 +499,10 @@ int main()
   // 设置深度测试函数，默认是GL_LESS，表示深度测试通过的条件是：当前片段的深度值小于缓冲区的深度值
   glDepthFunc(GL_LESS);
   // glDepthFunc(GL_ALWAYS); // 总是通过深度测试
+
+  // 启用混合
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   // 创建着色器（包括顶点着色器、片段着色器、着色器程序、uniform设置）
   // 物体着色器
@@ -539,19 +564,27 @@ int main()
   GLint locLightProjection = lightObjectShader.getUniformLocation("projection");
 
   // 重建几何体
-  PlaneGeometry planeGeometry(10.0, 10.0, 10.0, 10.0);
-  BoxGeometry boxGeometry(1.0, 1.0, 1.0);
-  SphereGeometry sphereGeometry(0.04, 10.0, 10.0);
+  PlaneGeometry grassGeometry(1.0, 1.0);               // 草丛
+  PlaneGeometry planeGeometry(10.0, 10.0, 10.0, 10.0); // 地面
+  BoxGeometry boxGeometry(1.0, 1.0, 1.0); // 盒子
+  SphereGeometry sphereGeometry(0.04, 10.0, 10.0); // 点光源位置显示
+
+  // 纹理类型地址
+  GLint locObjectType = sceneShader.getUniformLocation("objectType");
 
   // ************************************************************
   // 纹理加载
-  unsigned int diffuseBrickMap, diffuseWoodMap;
+  unsigned int diffuseBrickMap, diffuseWoodMap, diffuseGrassMap;
   int width1, height1, channels1;
   int width2, height2, channels2;
+  int width3, height3, channels3;
   // 纹理1
   diffuseBrickMap = loadTexture("../static/texture/brick_diffuse.jpg", width2, height2, channels2);
   // 纹理2
   diffuseWoodMap = loadTexture("../static/texture/wood.png", width1, height1, channels1);  
+  // 纹理3
+  // diffuseGrassMap = loadTexture("../static/texture/blending_transparent_window.png", width3, height3, channels3); // 草丛
+  diffuseGrassMap = loadTexture("../static/texture/grass.png", width3, height3, channels3, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE); // 草丛
 
   // ************************************************************
   // 渲染循环
@@ -563,7 +596,7 @@ int main()
     lastFrame = currentFrame;
     // 处理输入（使用最新的deltaTime）
     processInput(window);
-
+    // *************************************************************************
     // 在标题中显示帧率信息
     int fps_value = (int)round(ImGui::GetIO().Framerate);
     int ms_value = (int)round(1000.0f / ImGui::GetIO().Framerate);
@@ -571,12 +604,12 @@ int main()
     std::string ms = std::to_string(ms_value);
     std::string newTitle = "LearnOpenGL - " + ms + " ms/frame " + FPS;
     glfwSetWindowTitle(window, newTitle.c_str());
-
+    // *************************************************************************
     // 开始ImGui框架
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-
+    // *************************************************************************
     {
       ImGui::Begin("Hello, world!");
       // 设置固定控件宽度
@@ -615,7 +648,7 @@ int main()
       
       ImGui::End();
     }
-
+    // *************************************************************************
     // 渲染指令
     // 设置背景颜色
     glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
@@ -623,8 +656,11 @@ int main()
     // 清除颜色缓冲和深度缓冲
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // ************************************************************************* 
+    // 着色器启动
     sceneShader.use();
 
+    // 传入uniform值
     // 时间因子
     factor = glfwGetTime();
     sceneShader.setFloat(locFactor, factor * 0.01f);
@@ -637,8 +673,9 @@ int main()
     // sceneShader.setInt(locMaterialDiffuseWoodMap, diffuseWoodMap);
     // sceneShader.setInt(locMaterialDiffuseBrickMap, diffuseBrickMap);
     sceneShader.setFloat(locMaterialShininess, shininess);
-    sceneShader.setInt("diffuseBrickMap", 0);
-    sceneShader.setInt("diffuseWoodMap", 1);
+    sceneShader.setInt("diffuseWoodMap", 0);
+    sceneShader.setInt("diffuseBrickMap", 1);
+    sceneShader.setInt("diffuseGrassMap", 2);
 
     // 平行光源属性传入着色器中
     // 设置平行光源位置，沿着x轴往返运动
@@ -668,19 +705,28 @@ int main()
       sceneShader.setFloat(locPointLightAttenuationQuadratic[i], lightAttenuationQuadratic);
     }
     
+    // ************************************************************
 
     // ************************************************************
-    // 激活纹理单元，并绑定纹理
+    // 绘制地板
+    glBindVertexArray(planeGeometry.VAO);
+
+    sceneShader.setInt(locObjectType, 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, diffuseBrickMap);
-    glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, diffuseWoodMap);
 
-    // ************************************************************
-    // 绑定VAO
-    // 先绑定立方体
-    glBindVertexArray(boxGeometry.VAO);
+    glm::mat4 modelPlane = glm::mat4(1.0f);
+    modelPlane = glm::rotate(modelPlane, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
 
+    sceneShader.setFloat("uvScale", 0.25f); // 设置纹理缩放，缩小4倍，因为纹理坐标是[0,1]，所以缩小4倍后，纹理坐标为[0, 0.25]。
+    sceneShader.setMat4("model", modelPlane);
+
+    glDrawElements(GL_TRIANGLES, planeGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0); // 解绑VAO
+
+    // ************************************************************
+    // 立方体
     // 创建视图矩阵view
     glm::mat4 view = glm::mat4(1.0f);
     view = camera.GetViewMatrix();
@@ -694,6 +740,13 @@ int main()
     // 设置2个立方体位置
     for(unsigned int i = 0; i < sizeof(cubePositions) / sizeof(cubePositions[0]); i++)
     {
+      // 绑定VAO
+      glBindVertexArray(boxGeometry.VAO);
+
+      sceneShader.setInt(locObjectType, 1);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, diffuseBrickMap);
+
       // 创建模型矩阵
       glm::mat4 model = glm::mat4(1.0f);
       // 根据位置数组来平移立方体
@@ -707,22 +760,40 @@ int main()
 
       // 绘制立方体
       glDrawElements(GL_TRIANGLES, boxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+
+      glBindVertexArray(0); // 解绑VAO
     }
 
     // ************************************************************
-    // 绘制平面
-    glBindVertexArray(planeGeometry.VAO);
+    // 绘制草丛面板
+    // 对透明物体进行动态排序
+    std::map<float, glm::vec3> sorted;
+    for (unsigned int i = 0; i < grassPositions.size(); i++)
+    {
+      float distance = glm::length(camera.Position - grassPositions[i]);
+      sorted[distance] = grassPositions[i];
+    }
 
-    glm::mat4 modelPlane = glm::mat4(1.0f);
-    modelPlane = glm::rotate(modelPlane, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+    for (std::map<float, glm::vec3>::reverse_iterator iterator = sorted.rbegin(); iterator != sorted.rend(); iterator++)
+    {
+      glBindVertexArray(grassGeometry.VAO);
 
-    sceneShader.setFloat("uvScale", 4.0f);
-    sceneShader.setMat4("model", modelPlane);
+      sceneShader.setInt(locObjectType, 2);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, diffuseGrassMap);
 
-    glDrawElements(GL_TRIANGLES, planeGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+      sceneShader.setFloat("uvScale", 1.0f); 
+
+      glm::mat4 model = glm::mat4(1.0f);
+      model = glm::translate(model, iterator->second);
+      sceneShader.setMat4("model", model);
+      glDrawElements(GL_TRIANGLES, grassGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+      glBindVertexArray(0);
+    }
+
 
     // ************************************************************
-    // 绘制灯光物体
+    // 绘制灯光球体
     // 使用灯光物体着色器
     lightObjectShader.use();
     lightObjectShader.setMat4(locLightView, view);
@@ -902,7 +973,7 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 }
 
 // 加载纹理
-unsigned int loadTexture(const char* path, int& outWidth, int& outHeight, int& outChannels) {
+unsigned int loadTexture(const char* path, int& outWidth, int& outHeight, int& outChannels, GLint wrapS, GLint wrapT) {
     unsigned int textureID = 0;
 
     stbi_set_flip_vertically_on_load(true); // 图像y轴翻转
@@ -912,7 +983,7 @@ unsigned int loadTexture(const char* path, int& outWidth, int& outHeight, int& o
         // 生成纹理ID
         glGenTextures(1, &textureID);
         // 绑定纹理
-    glBindTexture(GL_TEXTURE_2D, textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);
 
         // 设置纹理参数
         GLenum format = GL_RGB;
@@ -924,18 +995,19 @@ unsigned int loadTexture(const char* path, int& outWidth, int& outHeight, int& o
         glTexImage2D(GL_TEXTURE_2D, 0, format, outWidth, outHeight, 0, 
                     format, GL_UNSIGNED_BYTE, data);
         // 生成mipmap
-    glGenerateMipmap(GL_TEXTURE_2D);
+        glGenerateMipmap(GL_TEXTURE_2D);
 
-        // 设置纹理环绕方式
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // 设置纹理环绕方式（设置纹理坐标超出[0,1]范围时的处理方式）
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT);
+        // 设置纹理缩放时的采样方式（设置纹理被放大和缩小时，使用哪种采样方式）
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    stbi_image_free(data);
+        stbi_image_free(data);
     } else {
         std::cerr << "Texture failed to load: " << path << std::endl;
-    stbi_image_free(data);
-  }
+        stbi_image_free(data);
+    }
     return textureID; // 只返回textureID
 }
