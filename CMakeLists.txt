@@ -31,7 +31,7 @@ file(GLOB SOURCES
 
 # 添加可执行文件
 add_executable(
-    main src/17_Blending_02/main.cpp
+    main src/18_Face_Culling/main.cpp
     ${SOURCES}
 )
 
