@@ -536,7 +536,8 @@ int main()
   // 初始化ImGui
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO(); (void)io;
+  ImGuiIO& io = ImGui::GetIO(); 
+  (void)io;
   ImGui::StyleColorsDark(); // 设置ImGui风格
   ImGui_ImplGlfw_InitForOpenGL(window, true); // 设置渲染平台
   ImGui_ImplOpenGL3_Init("#version 330"); // 设置渲染器后端
@@ -962,17 +963,8 @@ int main()
     }
 
     // ************************************************************
-    // 2. 解绑帧缓冲，将帧缓冲对象绑定到默认帧缓存上
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    // glDisable(GL_DEPTH_TEST);
-
-    // glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
     //绘制创建的帧缓冲屏幕窗口
     framebufferShader.use();
-
-    
 
     glBindVertexArray(frameGeometry.VAO);    
     glActiveTexture(GL_TEXTURE0);
@@ -980,6 +972,13 @@ int main()
     framebufferShader.setInt("screenTexture", 0);
     glDrawElements(GL_TRIANGLES, frameGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
+
+    // 2. 解绑帧缓冲，将帧缓冲对象绑定到默认帧缓存上
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // glDisable(GL_DEPTH_TEST);
+
+    // glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    // glClear(GL_COLOR_BUFFER_BIT);
 
     // ************************************************************
     // 渲染ImGui部分
@@ -1008,8 +1007,8 @@ int main()
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
   glViewport(0, 0, width, height);
-    SCREEN_WIDTH = width;
-    SCREEN_HEIGHT = height;
+  SCREEN_WIDTH = width;
+  SCREEN_HEIGHT = height;
 }
 
 // 键盘输入处理
