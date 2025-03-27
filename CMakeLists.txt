@@ -31,7 +31,7 @@ file(GLOB SOURCES
 
 # 添加可执行文件
 add_executable(
-    main src/19_Framebuffers/main2.cpp
+    main src/20_Cubemaps/main.cpp
     ${SOURCES}
 )
 

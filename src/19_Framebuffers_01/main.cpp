@@ -765,7 +765,7 @@ int main()
 
     // 1. 绑定帧缓冲，将帧缓冲对象绑定到当前绑定的帧缓冲上，这里的帧缓冲是自定义的帧缓冲
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    // glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     // 设置背景颜色
     glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
     // 清除颜色缓冲和深度缓冲
@@ -853,11 +853,10 @@ int main()
     sceneShader.setMat4(locProjection, projection);
 
     // 设置2个立方体位置
+    // 绑定VAO
+    glBindVertexArray(boxGeometry.VAO);
     for(unsigned int i = 0; i < sizeof(cubePositions) / sizeof(cubePositions[0]); i++)
     {
-      // 绑定VAO
-      glBindVertexArray(boxGeometry.VAO);
-
       sceneShader.setInt(locObjectType, 1);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, diffuseBrickMap);
@@ -875,10 +874,8 @@ int main()
 
       // 绘制立方体
       glDrawElements(GL_TRIANGLES, boxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
-
-      glBindVertexArray(0); // 解绑VAO
     }
-
+    glBindVertexArray(0); // 解绑VAO
     // ************************************************************
     // 绘制窗户面板
 
@@ -908,10 +905,10 @@ int main()
       sorted[distance] = grassPositions[i];
     }
 
+    glBindVertexArray(windowGeometry.VAO);
+
     for (std::map<float, glm::vec3>::reverse_iterator iterator = sorted.rbegin(); iterator != sorted.rend(); iterator++)
     {
-      glBindVertexArray(windowGeometry.VAO);
-
       sceneShader.setInt(locObjectType, 2);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, diffuseWindowMap);
@@ -922,9 +919,9 @@ int main()
       model = glm::translate(model, iterator->second);
       sceneShader.setMat4("model", model);
       glDrawElements(GL_TRIANGLES, windowGeometry.indices.size(), GL_UNSIGNED_INT, 0);
-      glBindVertexArray(0);
     }
 
+    glBindVertexArray(0);
 
     // ************************************************************
     // 绘制灯光球体
@@ -956,30 +953,23 @@ int main()
       lightObjectShader.setMat4("model", model);
       lightObjectShader.setVec3("lightColor", pointLightColors[i]);
 
-      // 绑定VAO
-      glBindVertexArray(sphereGeometry.VAO);
       // 绘制
       glDrawElements(GL_TRIANGLES, sphereGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     }
+
+    glBindVertexArray(0);
 
     // ************************************************************
     //绘制创建的帧缓冲屏幕窗口
     framebufferShader.use();
 
-    glBindVertexArray(frameGeometry.VAO);    
-    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(frameGeometry.VAO); // 绑定VAO
+   
     glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-    framebufferShader.setInt("screenTexture", 0);
+
     glDrawElements(GL_TRIANGLES, frameGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
-
-    // 2. 解绑帧缓冲，将帧缓冲对象绑定到默认帧缓存上
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    // glDisable(GL_DEPTH_TEST);
-
-    // glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    // glClear(GL_COLOR_BUFFER_BIT);
-
+    glBindVertexArray(0); // 解绑VAO
     // ************************************************************
     // 渲染ImGui部分
     ImGui::Render();

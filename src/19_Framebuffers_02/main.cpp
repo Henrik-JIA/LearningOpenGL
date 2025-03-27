@@ -255,40 +255,9 @@ in vec2 outTexCoord;
 
 uniform sampler2D screenTexture;
 
-const float offset = 1.0 / 300.0;
 void main() {
-
   // 反相
-  // vec3 texColor = 1.0 - texture(screenTexture, outTexCoord).rgb;
-  // FragColor = vec4(texColor, 1.0);
-
-  // 灰度
-  // vec3 texColor = texture(screenTexture, outTexCoord).rgb;
-  // float average = 0.2126 * texColor.r + 0.7152 * texColor.g + 0.0722 * texColor.b;
-  // FragColor = vec4(vec3(average), 1.0);
-
-  vec2 offsets[9] = vec2[] (vec2(-offset, offset), // 左上
-  vec2(0.0f, offset), // 正上
-  vec2(offset, offset), // 右上
-  vec2(-offset, 0.0f),   // 左
-  vec2(0.0f, 0.0f),   // 中
-  vec2(offset, 0.0f),   // 右
-  vec2(-offset, -offset), // 左下
-  vec2(0.0f, -offset), // 正下
-  vec2(offset, -offset)  // 右下
-  );
-
-  float kernel[9] = float[] (1.0, 1.0, 1.0, 1.0, -8.0, 1.0, 1.0, 1.0, 1.0);
-  vec3 sampleTex[9];
-  for(int i = 0; i < 9; i++) {
-    sampleTex[i] = vec3(texture(screenTexture, outTexCoord.st + offsets[i]));
-  }
-
-  vec3 col = vec3(0.0);
-  for(int i = 0; i < 9; i++)
-    col += sampleTex[i] * kernel[i];
-
-  FragColor = vec4(col, 1.0);
+  FragColor = vec4(vec3(1.0 - texture(screenTexture, outTexCoord).rgb), 1.0);
 
 }
 
@@ -326,6 +295,8 @@ double lastX = SCREEN_WIDTH / 2.0f; // 鼠标上一帧的位置
 double lastY = SCREEN_HEIGHT / 2.0f;
 
 Camera camera(glm::vec3(0.0, 1.0, 6.0));
+
+unsigned int texColorBuffer, renderBuffer;
 
 using namespace std;
 
@@ -379,9 +350,9 @@ int main()
   glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   // 启用点大小
   glEnable(GL_PROGRAM_POINT_SIZE);
-  // 深度测试
-  glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
+  // 深度测试（这里注释掉，因为我们使用了自定义的帧缓冲对象）
+  // glEnable(GL_DEPTH_TEST);
+  // glDepthFunc(GL_LESS);
   // 启用混合
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // 设置混合函数
@@ -392,10 +363,10 @@ int main()
   // 创建着色器（包括顶点着色器、片段着色器、着色器程序、uniform设置）
   // 物体着色器
   Shader sceneShader = Shader::FromSource(scene_vert, scene_frag);
-  // 帧缓冲着色器
-  Shader frameBufferShader = Shader::FromSource(frame_buffer_quad_vert, frame_buffer_quad_frag);
   // 灯光物体着色器
   Shader lightObjectShader = Shader::FromSource(light_object_vert, light_object_frag);
+  // 帧缓冲着色器
+  Shader frameBufferShader = Shader::FromSource(frame_buffer_quad_vert, frame_buffer_quad_frag);
 
   // Shader sceneShader("./shader/scene_vert.glsl", "./shader/scene_frag.glsl");
   // Shader frameBufferShader("./shader/frame_buffer_quad_vert.glsl", "./shader/frame_buffer_quad_frag.glsl");
@@ -460,25 +431,25 @@ int main()
   // 进行渲染操作
 
   // 2. 创建颜色附件(纹理)
-  unsigned int texColorBuffer; 
+  // unsigned int texColorBuffer; // 定义在全局区域了，当根据窗口大小了好调整。
   glGenTextures(1, &texColorBuffer); // 生成纹理
   glBindTexture(GL_TEXTURE_2D, texColorBuffer); // 绑定纹理
   // 设置纹理参数(大小与屏幕相同)
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL); // 设置纹理数据
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // 设置纹理过滤，GL_LINEAR表示线性过滤，GL_TEXTURE_MIN_FILTER表示缩小过滤
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // 设置纹理过滤，GL_LINEAR表示线性过滤，GL_TEXTURE_MAG_FILTER表示放大过滤
-  // glBindTexture(GL_TEXTURE_2D, 0); // 解绑纹理
+  // glBindTexture(GL_TEXTURE_2D, 0); // 解绑纹理（最后通过解绑帧缓冲对象时，顺带也解绑了纹理）
 
   // 3. 将它附加到当前绑定的帧缓冲对象
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0); // 将颜色纹理附加到当前绑定的帧缓冲对象
 
   // 4. 创建渲染缓冲对象(用于深度和模板测试)
-  unsigned int renderBuffer;
+  // unsigned int renderBuffer; // 定义在全局区域了，当根据窗口大小了好调整。
   glGenRenderbuffers(1, &renderBuffer); // 生成渲染缓冲
   glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer); // 绑定渲染缓冲
   // 设置深度和模板缓冲
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCREEN_WIDTH, SCREEN_HEIGHT); // 设置渲染缓冲存储
-  glBindRenderbuffer(GL_RENDERBUFFER, 0); // 解绑渲染缓冲
+  // glBindRenderbuffer(GL_RENDERBUFFER, 0); // 解绑渲染缓冲（最后通过解绑帧缓冲对象时，顺带也解绑了渲染缓冲）
 
   // 5. 将渲染缓冲附加到帧缓存对象的深度和模板附件上，渲染缓冲也是帧缓冲对象，区别在于帧缓冲可以进行采样，渲染缓冲不能进行采样
   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderBuffer); // 将渲染缓冲对象附加到帧缓冲的深度和模板附件上
@@ -532,7 +503,7 @@ int main()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // 清除颜色缓冲和深度缓冲
 
     // ************************************************************************* 
-    // 着色器启动
+    // 物体着色器启动
     sceneShader.use();
 
     // 时间因子
@@ -554,7 +525,7 @@ int main()
     projection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
 
     glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()) * 2.0, lightPosition.y, lightPosition.z);
-    sceneShader.use();
+    
     sceneShader.setMat4("view", view);
     sceneShader.setMat4("projection", projection);
 
@@ -566,7 +537,6 @@ int main()
 
     for (unsigned int i = 0; i < 4; i++)
     {
-
       // 设置点光源属性
       sceneShader.setVec3("pointLights[" + std::to_string(i) + "].position", pointLightPositions[i]);
       sceneShader.setVec3("pointLights[" + std::to_string(i) + "].ambient", 0.01f, 0.01f, 0.01f);
@@ -599,7 +569,7 @@ int main()
 
     // 绘制砖块
     // ----------------------------------------------------------
-    glBindVertexArray(boxGeometry.VAO);// 绑定VAO
+    glBindVertexArray(boxGeometry.VAO); // 绑定VAO
     glBindTexture(GL_TEXTURE_2D, brickMap);
     sceneShader.setFloat("uvScale", 1.0f);
 
@@ -621,7 +591,7 @@ int main()
 
     // 绘制草丛面板
     // ----------------------------------------------------------
-    glBindVertexArray(grassGeometry.VAO);
+    glBindVertexArray(grassGeometry.VAO); // 绑定VAO
     glBindTexture(GL_TEXTURE_2D, grassMap);
 
     // 对透明物体进行动态排序
@@ -639,23 +609,30 @@ int main()
       sceneShader.setMat4("model", model);
       glDrawElements(GL_TRIANGLES, grassGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     }
+
+    glBindVertexArray(0); // 解绑VAO
     // ----------------------------------------------------------
 
     // 绘制灯光物体
     // ************************************************************
+    // 灯光物体着色器启动
     lightObjectShader.use();
+
+    // 绘制平行光位置球体
     lightObjectShader.setMat4("view", view);
     lightObjectShader.setMat4("projection", projection);
 
     model = glm::mat4(1.0f);
-    model = glm::translate(model, lightPos);
+    model = glm::translate(model, lightPos); // 这里lightPos按照x轴往复运动
 
     lightObjectShader.setMat4("model", model);
     lightObjectShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
-    glBindVertexArray(pointLightGeometry.VAO);
+    glBindVertexArray(pointLightGeometry.VAO); // 绑定VAO
+
     glDrawElements(GL_TRIANGLES, pointLightGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
+    // 绘制点光源位置球体
     for (unsigned int i = 0; i < 4; i++)
     {
       model = glm::mat4(1.0f);
@@ -664,32 +641,48 @@ int main()
       lightObjectShader.setMat4("model", model);
       lightObjectShader.setVec3("lightColor", pointLightColors[i]);
 
-      glBindVertexArray(pointLightGeometry.VAO);
       glDrawElements(GL_TRIANGLES, pointLightGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     }
+
+    glBindVertexArray(0); // 解绑VAO
     // ************************************************************
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // 返回默认的帧缓冲对象
     glDisable(GL_DEPTH_TEST);
 
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    // glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    // glClear(GL_COLOR_BUFFER_BIT);
 
     //绘制创建的帧缓冲屏幕窗口
     frameBufferShader.use();
 
-    glBindVertexArray(frameGeometry.VAO);
+    glBindVertexArray(frameGeometry.VAO); // 绑定VAO
+   
     glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+
     glDrawElements(GL_TRIANGLES, frameGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0); // 解绑VAO
+
+    // ************************************************************
 
     // 渲染 gui
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
+    // 交换缓冲
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
+  // 释放资源
+  // 清理ImGui
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+
+  grassGeometry.dispose();
+  frameGeometry.dispose();
   boxGeometry.dispose();
   groundGeometry.dispose();
   pointLightGeometry.dispose();
@@ -704,6 +697,16 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
   glViewport(0, 0, width, height);
   SCREEN_WIDTH = width;
   SCREEN_HEIGHT = height;
+
+  // 更新帧缓冲附件尺寸
+  glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+  glBindTexture(GL_TEXTURE_2D, 0); // 解绑（也可以不写）
+
+  glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCREEN_WIDTH, SCREEN_HEIGHT);
+  glBindRenderbuffer(GL_RENDERBUFFER, 0); // 解绑（也可以不写）
+
 }
 
 // 键盘输入监听
@@ -743,17 +746,17 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     // 左键：视角旋转
     if (isMousePressed) {
         float rotationSpeed = 3.0f;
-  float xoffset = xpos - lastX;
+        float xoffset = xpos - lastX;
         float yoffset = lastY - ypos; // 反转Y轴
 
-  lastX = xpos;
-  lastY = ypos;
+        lastX = xpos;
+        lastY = ypos;
 
         // 设置旋转速度
         xoffset *= rotationSpeed;
         yoffset *= rotationSpeed;
 
-  camera.ProcessMouseMovement(xoffset, yoffset);
+        camera.ProcessMouseMovement(xoffset, yoffset);
         cameraPos = camera.Position;
         cameraFront = camera.Front;
     }
