@@ -324,8 +324,8 @@ in vec3 outTexCoord;
 uniform samplerCube skyboxTexture;
 
 void main() {
-  // FragColor = vec4(texture(skyboxTexture, outTexCoord).rgb, 1.0);
-  FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+  FragColor = vec4(texture(skyboxTexture, outTexCoord).rgb, 1.0);
+  // FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }
 
 )";
@@ -338,7 +338,9 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset); // 滚
 
 unsigned int loadTexture(const char* path, GLint wrapS = GL_REPEAT, GLint wrapT = GL_REPEAT); // 加载纹理
 unsigned int loadCubemap(vector<std::string> faces);
-void drawSkyBox(Shader shader, BoxGeometry geometry, unsigned int cubeMap);
+
+// void drawSkyBox(Shader shader, BoxGeometry geometry, unsigned int cubeMap, glm::mat4 view, glm::mat4 projection);
+void drawSkyBox(Shader &shader, BoxGeometry &geometry, unsigned int& cubeMap, glm::mat4 &view, glm::mat4 &projection);
 
 int SCREEN_WIDTH = 800;
 int SCREEN_HEIGHT = 600;
@@ -585,7 +587,8 @@ int main()
     
     // ************************************************************************* 
     // 绘制天空盒
-    drawSkyBox(skyboxShader, skyboxGeometry, cubemapTexture);
+    // drawSkyBox(skyboxShader, skyboxGeometry, cubemapTexture);
+
 
     // ************************************************************************* 
     // 修改光源颜色
@@ -731,6 +734,26 @@ int main()
 
     glBindVertexArray(0); // 解绑VAO
 
+    
+    drawSkyBox(skyboxShader, skyboxGeometry, cubemapTexture, view, projection);
+    // glDepthFunc(GL_LEQUAL);
+  
+    // // glm::mat4 view = camera.GetViewMatrix();
+    // // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+  
+    // skyboxShader.use();
+    // view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // 移除平移分量
+  
+    // skyboxShader.setMat4("view", view);
+    // skyboxShader.setMat4("projection", projection);
+  
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+    // glBindVertexArray(skyboxGeometry.VAO);
+    // glDrawElements(GL_TRIANGLES, skyboxGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+  
+    // glBindVertexArray(0);
+    // glDepthFunc(GL_LESS);
 
     // 帧缓冲对象绘制
     // ************************************************************
@@ -752,6 +775,7 @@ int main()
     glDrawElements(GL_TRIANGLES, frameGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
     glBindVertexArray(0); // 解绑VAO
+
 
     // ************************************************************
     
@@ -994,27 +1018,21 @@ unsigned int loadCubemap(vector<std::string> faces)
   return textureID;
 }
 
-void drawSkyBox(Shader shader, BoxGeometry geometry, unsigned int cubeMap)
+void drawSkyBox(Shader& shader, BoxGeometry& geometry, unsigned int& cubeMap, glm::mat4& view, glm::mat4& projection)
 {
-  glDepthFunc(GL_LEQUAL);
-  glDisable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
 
-  glm::mat4 view = camera.GetViewMatrix();
-  glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
-
-  shader.use();
-  view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // 移除平移分量
-
-  shader.setMat4("view", view);
-  shader.setMat4("projection", projection);
-
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
-  glBindVertexArray(geometry.VAO);
-  glDrawElements(GL_TRIANGLES, geometry.indices.size(), GL_UNSIGNED_INT, 0);
-
-  glBindVertexArray(0);
-  glDepthFunc(GL_LESS);
-  glEnable(GL_DEPTH_TEST);
-  // view = camera.GetViewMatrix();
+    shader.use();
+    view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // 移除平移分量
+  
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
+  
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
+    glBindVertexArray(geometry.VAO);
+    glDrawElements(GL_TRIANGLES, geometry.indices.size(), GL_UNSIGNED_INT, 0);
+  
+    glBindVertexArray(0);
+    glDepthFunc(GL_LESS);
 }
