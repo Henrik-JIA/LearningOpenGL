@@ -17,6 +17,39 @@
 
 // 着色器代码
 const char *scene_vert = R"(
+
+#version 330 core
+layout(location = 0) in vec3 Position;
+layout(location = 1) in vec3 Normal;
+layout(location = 2) in vec2 TexCoords;
+out vec2 outTexCoord;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main() {
+  gl_Position = projection * view * model * vec4(Position, 1.0f);
+  outTexCoord = TexCoords;
+}
+
+)";
+
+const char *scene_frag = R"(
+
+#version 330 core
+out vec4 FragColor;
+in vec2 outTexCoord;
+
+uniform vec3 lightColor;
+
+void main() {
+  FragColor = vec4(lightColor, 1.0);
+}
+
+)";
+
+const char *light_object_vert = R"(
 #version 330 core
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec3 Normal;
@@ -44,9 +77,12 @@ void main() {
   // 解决不等比缩放，对法向量产生的影响
   outNormal = mat3(transpose(inverse(model))) * Normal;
 }
+
+
+
 )";
 
-const char *scene_frag = R"(
+const char *light_object_frag = R"(
 
 #version 330 core
 out vec4 FragColor;
@@ -196,38 +232,6 @@ float LinearizeDepth(float depth, float near, float far) {
   return (2.0 * near * far) / (far + near - z * (far - near));
 }
 
-)";
-
-const char *light_object_vert = R"(
-
-#version 330 core
-layout(location = 0) in vec3 Position;
-layout(location = 1) in vec3 Normal;
-layout(location = 2) in vec2 TexCoords;
-out vec2 outTexCoord;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-void main() {
-  gl_Position = projection * view * model * vec4(Position, 1.0f);
-  outTexCoord = TexCoords;
-}
-
-)";
-
-const char *light_object_frag = R"(
-
-#version 330 core
-out vec4 FragColor;
-in vec2 outTexCoord;
-
-uniform vec3 lightColor;
-
-void main() {
-  FragColor = vec4(lightColor, 1.0);
-}
 
 )";
 
@@ -428,35 +432,29 @@ int main()
   // glCullFace(GL_BACK);
 
   // 创建着色器（包括顶点着色器、片段着色器、着色器程序、uniform设置）
-  // 物体着色器
+  
+  // 物体着色器，仅绘制纯色物体，不涉及光照
   Shader sceneShader = Shader::FromSource(scene_vert, scene_frag);
-  // 灯光物体着色器
+  // 灯光物体着色器，光照对物体的影像
   Shader lightObjectShader = Shader::FromSource(light_object_vert, light_object_frag);
   // 天空盒子着色器
   Shader skyboxShader = Shader::FromSource(cube_map_vert, cube_map_frag);
   // 帧缓冲着色器
   Shader frameBufferShader = Shader::FromSource(frame_buffer_quad_vert, frame_buffer_quad_frag);
-  // Shader sceneShader("./shader/scene_vert.glsl", "./shader/scene_frag.glsl");
-  // Shader frameBufferShader("./shader/frame_buffer_quad_vert.glsl", "./shader/frame_buffer_quad_frag.glsl");
-  // Shader lightObjectShader("./shader/light_object_vert.glsl", "./shader/light_object_frag.glsl");
+  // Shader sceneShader = Shader::FromFile("../src/20_Cubemaps_02/shader/scene_vert.glsl", "../src/20_Cubemaps_02/shader/scene_frag.glsl");
+  // Shader lightObjectShader = Shader::FromFile("../src/20_Cubemaps_02/shader/light_object_vert.glsl", "../src/20_Cubemaps_02/shader/light_object_frag.glsl");
+  // Shader frameBufferShader = Shader::FromFile("../src/20_Cubemaps_02/shader/frame_buffer_quad_vert.glsl", "../src/20_Cubemaps_02/shader/frame_buffer_quad_frag.glsl");
+  // Shader skyboxShader = Shader::FromFile("../src/20_Cubemaps_02/shader/cube_map_vert.glsl", "../src/20_Cubemaps_02/shader/cube_map_frag.glsl");
 
   float factor = 0.0;
 
   float fov = 45.0f; // 视锥体的角度
   
+  int NR_POINT_LIGHTS = 4;
+
   ImVec4 clear_color = ImVec4(25.0 / 255.0, 25.0 / 255.0, 25.0 / 255.0, 0.1); // 25, 25, 25
 
   glm::vec3 lightPosition = glm::vec3(1.0, 2.5, 2.0); // 光照位置
-
-  // 设置平行光光照属性
-  sceneShader.setVec3("directionLight.ambient", 0.6f, 0.6f, 0.6f);
-  sceneShader.setVec3("directionLight.diffuse", 0.9f, 0.9f, 0.9f); // 将光照调暗了一些以搭配场景
-  sceneShader.setVec3("directionLight.specular", 1.0f, 1.0f, 1.0f);
-
-  // 设置衰减
-  sceneShader.setFloat("light.constant", 1.0f);
-  sceneShader.setFloat("light.linear", 0.09f);
-  sceneShader.setFloat("light.quadratic", 0.032f);
 
   // 重建几何体
   PlaneGeometry groundGeometry(10.0, 10.0);            // 地面
@@ -507,7 +505,6 @@ int main()
   //     "../static/texture/Mountains_Lake/pz.jpg", // +Z 前
   //     "../static/texture/Mountains_Lake/nz.jpg", // -Z 后
   //     };
-
   vector<string> faces{
       "../static/texture/skybox/right.jpg",  // +X 右
       "../static/texture/skybox/left.jpg",   // -X 左
@@ -605,7 +602,7 @@ int main()
     // ************************************************************************* 
 
     // 绘制天空盒
-    drawSkyBox(skyboxShader, skyboxGeometry, cubemapTexture);
+    // drawSkyBox(skyboxShader, skyboxGeometry, cubemapTexture);
 
     // ************************************************************************* 
     // 修改光源颜色
@@ -614,56 +611,62 @@ int main()
     lightColor.y = sin(glfwGetTime() * 0.7f);
     lightColor.z = sin(glfwGetTime() * 1.3f);
 
-    float radius = 5.0f;
-    float camX = sin(glfwGetTime() * 0.5) * radius;
-    float camZ = cos(glfwGetTime() * 0.5) * radius;
-
+    // 设置视图矩阵和投影矩阵
     glm::mat4 view = camera.GetViewMatrix();
     glm::mat4 projection = glm::mat4(1.0f);
     projection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
 
-    glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()) * 2.0, lightPosition.y, lightPosition.z);
-  
-    // 物体着色器启动
-    sceneShader.use();
+    // 灯光着色器
+    lightObjectShader.use();
 
     // 时间因子
     factor = glfwGetTime();
-    sceneShader.setFloat("factor", -factor * 0.3);
+    lightObjectShader.setFloat("factor", -factor * 0.3);
 
-    sceneShader.setMat4("view", view);
-    sceneShader.setMat4("projection", projection);
+    lightObjectShader.setMat4("view", view);
+    lightObjectShader.setMat4("projection", projection);
 
-    sceneShader.setVec3("directionLight.direction", lightPos); // 光源位置
-    sceneShader.setVec3("viewPos", camera.Position);
+    // 设置相机位置
+    lightObjectShader.setVec3("viewPos", camera.Position);
 
+    // 这些光照属性设置必须在渲染循环内，因为每帧都会更新。
+    // 设置点光源光照属性
+    float radius = 5.0f;
+    float camX = sin(glfwGetTime() * 0.5) * radius;
+    float camZ = cos(glfwGetTime() * 0.5) * radius;
     pointLightPositions[0].z = camZ;
     pointLightPositions[0].x = camX;
-
-    for (unsigned int i = 0; i < 4; i++)
+    for (unsigned int i = 0; i < NR_POINT_LIGHTS; i++)
     {
-      // 设置点光源属性
-      sceneShader.setVec3("pointLights[" + std::to_string(i) + "].position", pointLightPositions[i]);
-      sceneShader.setVec3("pointLights[" + std::to_string(i) + "].ambient", 0.01f, 0.01f, 0.01f);
-      sceneShader.setVec3("pointLights[" + std::to_string(i) + "].diffuse", pointLightColors[i]);
-      sceneShader.setVec3("pointLights[" + std::to_string(i) + "].specular", 1.0f, 1.0f, 1.0f);
-
-      // // 设置衰减
-      sceneShader.setFloat("pointLights[" + std::to_string(i) + "].constant", 1.0f);
-      sceneShader.setFloat("pointLights[" + std::to_string(i) + "].linear", 0.09f);
-      sceneShader.setFloat("pointLights[" + std::to_string(i) + "].quadratic", 0.032f);
+      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].position", pointLightPositions[i]);
+      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].ambient", 0.01f, 0.01f, 0.01f);
+      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].diffuse", pointLightColors[i]);
+      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].specular", 1.0f, 1.0f, 1.0f);
+      lightObjectShader.setFloat("pointLights[" + std::to_string(i) + "].constant", 1.0f);
+      lightObjectShader.setFloat("pointLights[" + std::to_string(i) + "].linear", 0.09f);
+      lightObjectShader.setFloat("pointLights[" + std::to_string(i) + "].quadratic", 0.032f);
     }
+
+    // 设置平行光光照属性
+    glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()) * 2.0, lightPosition.y, lightPosition.z);
+    lightObjectShader.setVec3("directionLight.direction", lightPos); // 光源位置
+    // 设置平行光光照属性
+    lightObjectShader.setVec3("directionLight.ambient", 0.01f, 0.01f, 0.01f);
+    lightObjectShader.setVec3("directionLight.diffuse", 0.9f, 0.9f, 0.9f); // 将光照调暗了一些以搭配场景
+    lightObjectShader.setVec3("directionLight.specular", 1.0f, 1.0f, 1.0f);
+
 
     // 绘制地板
     // ********************************************************
+    
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, woodMap);
 
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
 
-    sceneShader.setFloat("uvScale", 4.0f);
-    sceneShader.setMat4("model", model);
+    lightObjectShader.setFloat("uvScale", 4.0f);
+    lightObjectShader.setMat4("model", model);
 
     glBindVertexArray(groundGeometry.VAO); // 绑定VAO
 
@@ -676,19 +679,19 @@ int main()
     // ----------------------------------------------------------
     glBindVertexArray(containerGeometry.VAO); // 绑定VAO
     glBindTexture(GL_TEXTURE_2D, brickMap);
-    sceneShader.setFloat("uvScale", 1.0f);
+    lightObjectShader.setFloat("uvScale", 1.0f);
 
     // 第一个砖块
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(1.0, 1.0, -1.0));
     model = glm::scale(model, glm::vec3(2.0, 2.0, 2.0));    
-    sceneShader.setMat4("model", model);
+    lightObjectShader.setMat4("model", model);
     glDrawElements(GL_TRIANGLES, containerGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
     // 第二个砖块
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(-1.0, 0.5, 2.0));
-    sceneShader.setMat4("model", model);
+    lightObjectShader.setMat4("model", model);
     glDrawElements(GL_TRIANGLES, containerGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     
     glBindVertexArray(0); // 解绑VAO
@@ -711,27 +714,25 @@ int main()
     {
       model = glm::mat4(1.0f);
       model = glm::translate(model, iterator->second);
-      sceneShader.setMat4("model", model);
+      lightObjectShader.setMat4("model", model);
       glDrawElements(GL_TRIANGLES, grassGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     }
 
     glBindVertexArray(0); // 解绑VAO
     // ----------------------------------------------------------
 
-    // 绘制灯光物体
+    // 绘制灯光球体（没有使用贴图，使用灯光颜色为球体颜色）
     // ************************************************************
-    // 灯光物体着色器启动
-    lightObjectShader.use();
-
+    sceneShader.use();
     // 绘制平行光位置球体
-    lightObjectShader.setMat4("view", view);
-    lightObjectShader.setMat4("projection", projection);
+    sceneShader.setMat4("view", view);
+    sceneShader.setMat4("projection", projection);
 
     model = glm::mat4(1.0f);
     model = glm::translate(model, lightPos); // 这里lightPos按照x轴往复运动
 
-    lightObjectShader.setMat4("model", model);
-    lightObjectShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+    sceneShader.setMat4("model", model);
+    sceneShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
     glBindVertexArray(pointLightGeometry.VAO); // 绑定VAO
 
@@ -743,8 +744,8 @@ int main()
       model = glm::mat4(1.0f);
       model = glm::translate(model, pointLightPositions[i]);
 
-      lightObjectShader.setMat4("model", model);
-      lightObjectShader.setVec3("lightColor", pointLightColors[i]);
+      sceneShader.setMat4("model", model);
+      sceneShader.setVec3("lightColor", pointLightColors[i]);
 
       glDrawElements(GL_TRIANGLES, pointLightGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     }
@@ -771,7 +772,6 @@ int main()
     glDrawElements(GL_TRIANGLES, frameGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
     glBindVertexArray(0); // 解绑VAO
-
 
     // ************************************************************
     
