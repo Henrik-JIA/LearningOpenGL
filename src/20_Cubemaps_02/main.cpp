@@ -16,7 +16,7 @@
 #include <tool/gui.h>
 
 // 着色器代码
-const char *scene_vert = R"(
+const char *light_sphere_vert = R"(
 
 #version 330 core
 layout(location = 0) in vec3 Position;
@@ -35,7 +35,7 @@ void main() {
 
 )";
 
-const char *scene_frag = R"(
+const char *light_sphere_frag = R"(
 
 #version 330 core
 out vec4 FragColor;
@@ -49,7 +49,7 @@ void main() {
 
 )";
 
-const char *light_object_vert = R"(
+const char *light_source_vert = R"(
 #version 330 core
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec3 Normal;
@@ -82,7 +82,7 @@ void main() {
 
 )";
 
-const char *light_object_frag = R"(
+const char *light_source_frag = R"(
 
 #version 330 core
 out vec4 FragColor;
@@ -153,10 +153,10 @@ void main() {
   // 定向光照
   vec3 result = CalcDirectionLight(directionLight, normal, viewDir);
 
-  // 点光源
-  for(int i = 0; i < NR_POINT_LIGHTS; i++) {
-    result += CalcPointLight(pointLights[i], normal, outFragPos, viewDir);
-  }
+  // // 点光源
+  // for(int i = 0; i < NR_POINT_LIGHTS; i++) {
+  //   result += CalcPointLight(pointLights[i], normal, outFragPos, viewDir);
+  // }
 
   vec4 texMap = texture(brickMap, outTexCoord);
 
@@ -334,6 +334,97 @@ void main() {
 
 )";
 
+// 反射物体着色器
+const char *reflect_object_vert = R"(
+#version 330 core
+layout (location = 0) in vec3 Position;
+layout (location = 1) in vec3 Normal;
+layout (location = 2) in vec2 TexCoords;
+
+
+out vec2 oTexCoord;
+out vec3 oNormal;
+out vec3 oPosition;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main()
+{
+    oTexCoord = TexCoords; // 纹理坐标
+    oNormal = mat3(transpose(inverse(model))) * Normal; // 法向量
+    oPosition = vec3(model * vec4(Position, 1.0)); // 物体位置
+    gl_Position = projection * view * model * vec4(Position, 1.0);
+}
+)";
+
+const char *reflect_object_frag = R"(
+#version 330 core
+out vec4 FragColor;
+
+in vec2 oTexCoord;
+in vec3 oNormal;
+in vec3 oPosition;
+
+uniform vec3 cameraPos;
+uniform samplerCube cubeTexture;
+uniform vec3 objectColor; 
+
+void main()
+{             
+    vec3 viewDir = normalize(oPosition - cameraPos); // 相机位置
+    vec3 R = reflect(viewDir, normalize(oNormal)); // 反射方向
+    vec3 cubeMapColor = texture(cubeTexture, R).rgb; // 立方体贴图颜色，R当UV坐标来用。
+    FragColor = vec4(cubeMapColor + objectColor, 1.0);
+}
+)";
+
+// 折射物体着色器
+const char *refract_object_vert = R"(
+#version 330 core
+layout (location = 0) in vec3 Position;
+layout (location = 1) in vec3 Normal;
+layout (location = 2) in vec2 TexCoords;
+
+
+out vec2 oTexCoord;
+out vec3 oNormal;
+out vec3 oPosition;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main()
+{
+    oTexCoord = TexCoords;
+    oNormal = mat3(transpose(inverse(model))) * Normal;
+    oPosition = vec3(model * vec4(Position, 1.0));
+    gl_Position = projection * view * model * vec4(Position, 1.0);
+}
+)";
+
+const char *refract_object_frag = R"(
+#version 330 core
+out vec4 FragColor;
+
+in vec2 oTexCoord;
+in vec3 oNormal;
+in vec3 oPosition;
+
+uniform vec3 cameraPos;
+uniform samplerCube cubeTexture;
+uniform vec3 objectColor;
+
+void main() {
+    float ratio = 1.0 / 1.52;
+    vec3 I = normalize(oPosition - cameraPos);
+    vec3 R = refract(I, normalize(oNormal), ratio);
+    FragColor = vec4(texture(cubeTexture, R).rgb + objectColor, 1.0);
+}
+)";
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos); // 鼠标回调函数
@@ -351,7 +442,7 @@ int SCREEN_HEIGHT = 600;
 // int SCREEN_HEIGHT = 1200;
 
 // camera value
-glm::vec3 cameraPos = glm::vec3(0.0f, 1.0f, 6.0f);
+glm::vec3 cameraPos = glm::vec3(0.0f, 1.0f, 10.0f);
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -365,7 +456,7 @@ bool isRightMousePressed = false;
 double lastX = SCREEN_WIDTH / 2.0f; // 鼠标上一帧的位置
 double lastY = SCREEN_HEIGHT / 2.0f;
 
-Camera camera(glm::vec3(0.0, 1.0, 6.0));
+Camera camera(glm::vec3(0.0, 1.0, 10.0));
 
 unsigned int texColorBuffer, renderBuffer;
 
@@ -434,17 +525,25 @@ int main()
   // 创建着色器（包括顶点着色器、片段着色器、着色器程序、uniform设置）
   
   // 物体着色器，仅绘制纯色物体，不涉及光照
-  Shader sceneShader = Shader::FromSource(scene_vert, scene_frag);
+  Shader lightObjectShader = Shader::FromSource(light_sphere_vert, light_sphere_frag);
   // 灯光物体着色器，光照对物体的影像
-  Shader lightObjectShader = Shader::FromSource(light_object_vert, light_object_frag);
+  Shader lightSourceShader = Shader::FromSource(light_source_vert, light_source_frag);
   // 天空盒子着色器
   Shader skyboxShader = Shader::FromSource(cube_map_vert, cube_map_frag);
   // 帧缓冲着色器
   Shader frameBufferShader = Shader::FromSource(frame_buffer_quad_vert, frame_buffer_quad_frag);
+  // 反射着色器
+  Shader reflectShader = Shader::FromSource(reflect_object_vert, reflect_object_frag);
+  // 折射着色器
+  Shader refractShader = Shader::FromSource(refract_object_vert, refract_object_frag);
+  
   // Shader sceneShader = Shader::FromFile("../src/20_Cubemaps_02/shader/scene_vert.glsl", "../src/20_Cubemaps_02/shader/scene_frag.glsl");
-  // Shader lightObjectShader = Shader::FromFile("../src/20_Cubemaps_02/shader/light_object_vert.glsl", "../src/20_Cubemaps_02/shader/light_object_frag.glsl");
+  // Shader lightSourceShader = Shader::FromFile("../src/20_Cubemaps_02/shader/light_vert.glsl", "../src/20_Cubemaps_02/shader/light_frag.glsl");
   // Shader frameBufferShader = Shader::FromFile("../src/20_Cubemaps_02/shader/frame_buffer_quad_vert.glsl", "../src/20_Cubemaps_02/shader/frame_buffer_quad_frag.glsl");
   // Shader skyboxShader = Shader::FromFile("../src/20_Cubemaps_02/shader/cube_map_vert.glsl", "../src/20_Cubemaps_02/shader/cube_map_frag.glsl");
+  // Shader reflectShader = Shader::FromFile("../src/20_Cubemaps_02/shader/reflect_object_vert.glsl", "../src/20_Cubemaps_02/shader/reflect_object_frag.glsl");
+  // Shader refractShader = Shader::FromFile("../src/20_Cubemaps_02/shader/refract_object_vert.glsl", "../src/20_Cubemaps_02/shader/refract_object_frag.glsl");
+
 
   float factor = 0.0;
 
@@ -471,10 +570,14 @@ int main()
 
   // 点光源的位置
   glm::vec3 pointLightPositions[] = {
-      glm::vec3(0.7f, 1.0f, 1.5f),
-      glm::vec3(2.3f, 3.0f, -4.0f),
-      glm::vec3(-4.0f, 2.0f, 1.0f),
-      glm::vec3(1.4f, 2.0f, 1.3f)};
+      glm::vec3(3.0f, 1.5f, 3.0f),    // 右前方
+      glm::vec3(-3.0f, 2.5f, -3.0f),  // 左后方
+      glm::vec3(-5.0f, 1.8f, 2.0f),   // 左侧更远处
+      glm::vec3(4.0f, 2.2f, -2.0f)};  // 右后方
+      // glm::vec3(0.7f, 1.0f, 1.5f),
+      // glm::vec3(2.3f, 3.0f, -4.0f),
+      // glm::vec3(-4.0f, 2.0f, 1.0f),
+      // glm::vec3(1.4f, 2.0f, 1.3f)};
   // 点光源颜色
   glm::vec3 pointLightColors[] = {
       glm::vec3(1.0f, 0.0f, 0.0f),
@@ -515,7 +618,7 @@ int main()
       };
 
   // 加载立方体贴图
-  unsigned int cubemapTexture = loadCubemap(faces);
+  unsigned int cubeMapTexture = loadCubemap(faces);
 
   // use framebuffer 使用帧缓存
   // ---------------------------------------------------------
@@ -578,7 +681,7 @@ int main()
 
     std::string FPS = std::to_string(fps_value);
     std::string ms = std::to_string(ms_value);
-    std::string newTitle = "LearnOpenGL - " + ms + " ms/frame " + FPS;
+    std::string newTitle = "OpenGL - " + ms + " ms/frame " + FPS;
     glfwSetWindowTitle(window, newTitle.c_str());
     // *************************************************************************
     // 开始ImGui框架
@@ -602,7 +705,7 @@ int main()
     // ************************************************************************* 
 
     // 绘制天空盒
-    // drawSkyBox(skyboxShader, skyboxGeometry, cubemapTexture);
+    drawSkyBox(skyboxShader, skyboxGeometry, cubeMapTexture);
 
     // ************************************************************************* 
     // 修改光源颜色
@@ -614,21 +717,33 @@ int main()
     // 设置视图矩阵和投影矩阵
     glm::mat4 view = camera.GetViewMatrix();
     glm::mat4 projection = glm::mat4(1.0f);
+    glm::mat4 model = glm::mat4(1.0f);
     projection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
 
+    // 反射着色器
+    reflectShader.use(); // 激活反射着色器
+    reflectShader.setMat4("view", view);
+    reflectShader.setMat4("projection", projection);
+    reflectShader.setVec3("cameraPos", camera.Position);
+    reflectShader.setVec3("objectColor", glm::vec3(0.0, 0.0, 0.0));
+    // reflectShader.setVec3("objectColor", glm::vec3(0.1, 0.1, 0.0));
+
+    // 折射着色器
+    refractShader.use(); // 激活折射着色器
+    refractShader.setMat4("view", view);
+    refractShader.setMat4("projection", projection);
+    refractShader.setVec3("cameraPos", camera.Position);
+    reflectShader.setVec3("objectColor", glm::vec3(0.0, 0.0, 0.0));
+    // refractShader.setVec3("objectColor", glm::vec3(0.1, 0.0, 0.1));
+
     // 灯光着色器
-    lightObjectShader.use();
-
-    // 时间因子
-    factor = glfwGetTime();
-    lightObjectShader.setFloat("factor", -factor * 0.3);
-
-    lightObjectShader.setMat4("view", view);
-    lightObjectShader.setMat4("projection", projection);
-
-    // 设置相机位置
-    lightObjectShader.setVec3("viewPos", camera.Position);
-
+    lightSourceShader.use(); // 激活灯光着色器
+    factor = glfwGetTime(); // 时间因子
+    lightSourceShader.setFloat("factor", -factor * 0.3);
+    lightSourceShader.setMat4("view", view); // 设置视图矩阵和投影矩阵
+    lightSourceShader.setMat4("projection", projection);
+    lightSourceShader.setVec3("viewPos", camera.Position); // 设置相机位置
+    
     // 这些光照属性设置必须在渲染循环内，因为每帧都会更新。
     // 设置点光源光照属性
     float radius = 5.0f;
@@ -638,119 +753,138 @@ int main()
     pointLightPositions[0].x = camX;
     for (unsigned int i = 0; i < NR_POINT_LIGHTS; i++)
     {
-      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].position", pointLightPositions[i]);
-      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].ambient", 0.01f, 0.01f, 0.01f);
-      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].diffuse", pointLightColors[i]);
-      lightObjectShader.setVec3("pointLights[" + std::to_string(i) + "].specular", 1.0f, 1.0f, 1.0f);
-      lightObjectShader.setFloat("pointLights[" + std::to_string(i) + "].constant", 1.0f);
-      lightObjectShader.setFloat("pointLights[" + std::to_string(i) + "].linear", 0.09f);
-      lightObjectShader.setFloat("pointLights[" + std::to_string(i) + "].quadratic", 0.032f);
+      lightSourceShader.setVec3("pointLights[" + std::to_string(i) + "].position", pointLightPositions[i]);
+      lightSourceShader.setVec3("pointLights[" + std::to_string(i) + "].ambient", 0.01f, 0.01f, 0.01f);
+      lightSourceShader.setVec3("pointLights[" + std::to_string(i) + "].diffuse", pointLightColors[i]);
+      lightSourceShader.setVec3("pointLights[" + std::to_string(i) + "].specular", 1.0f, 1.0f, 1.0f);
+      lightSourceShader.setFloat("pointLights[" + std::to_string(i) + "].constant", 1.0f);
+      lightSourceShader.setFloat("pointLights[" + std::to_string(i) + "].linear", 0.09f);
+      lightSourceShader.setFloat("pointLights[" + std::to_string(i) + "].quadratic", 0.032f);
     }
 
     // 设置平行光光照属性
-    glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()) * 2.0, lightPosition.y, lightPosition.z);
-    lightObjectShader.setVec3("directionLight.direction", lightPos); // 光源位置
+    // glm::vec3 lightPos = glm::vec3(lightPosition.x * glm::sin(glfwGetTime()) * 2.0, lightPosition.y, lightPosition.z); // 动态位置
+    glm::vec3 lightPos = glm::vec3(lightPosition.x, lightPosition.y, lightPosition.z); // 固定位置
+    lightSourceShader.setVec3("directionLight.direction", lightPos); // 光源位置
     // 设置平行光光照属性
-    lightObjectShader.setVec3("directionLight.ambient", 0.01f, 0.01f, 0.01f);
-    lightObjectShader.setVec3("directionLight.diffuse", 0.9f, 0.9f, 0.9f); // 将光照调暗了一些以搭配场景
-    lightObjectShader.setVec3("directionLight.specular", 1.0f, 1.0f, 1.0f);
+    lightSourceShader.setVec3("directionLight.ambient", 0.01f, 0.01f, 0.01f);
+    lightSourceShader.setVec3("directionLight.diffuse", 0.9f, 0.9f, 0.9f); // 将光照调暗了一些以搭配场景
+    lightSourceShader.setVec3("directionLight.specular", 1.0f, 1.0f, 1.0f);
 
 
     // 绘制地板
     // ********************************************************
     
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, woodMap);
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindTexture(GL_TEXTURE_2D, woodMap);
 
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+    // // 旋转地板
+    // model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+    // // 设置地板的UV缩放
+    // lightSourceShader.setFloat("uvScale", 4.0f);
+    // lightSourceShader.setMat4("model", model);
 
-    lightObjectShader.setFloat("uvScale", 4.0f);
-    lightObjectShader.setMat4("model", model);
+    // glBindVertexArray(groundGeometry.VAO); // 绑定VAO
 
-    glBindVertexArray(groundGeometry.VAO); // 绑定VAO
-
-    glDrawElements(GL_TRIANGLES, groundGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    // glDrawElements(GL_TRIANGLES, groundGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     
-    glBindVertexArray(0); // 解绑VAO
+    // glBindVertexArray(0); // 解绑VAO
+    
     // ********************************************************
 
     // 绘制砖块
     // ----------------------------------------------------------
-    glBindVertexArray(containerGeometry.VAO); // 绑定VAO
-    glBindTexture(GL_TEXTURE_2D, brickMap);
-    lightObjectShader.setFloat("uvScale", 1.0f);
-
-    // 第一个砖块
+    glBindVertexArray(containerGeometry.VAO); // 绑定砖块的VAO
+    glBindTexture(GL_TEXTURE_2D, brickMap); // 绑定砖块的纹理
+    
+    // 第一个砖块（左侧）反射
+    reflectShader.use(); // 激活反射着色器
     model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(1.0, 1.0, -1.0));
+    model = glm::translate(model, glm::vec3(-3.0f, 2.0f, 0.0f)); // X轴-3位置
+    model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(1.0, 0.0, 0.0));
     model = glm::scale(model, glm::vec3(2.0, 2.0, 2.0));    
-    lightObjectShader.setMat4("model", model);
+    reflectShader.setMat4("model", model);
     glDrawElements(GL_TRIANGLES, containerGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
-    // 第二个砖块
+    // 第二个砖块（中间）漫反射
+    lightSourceShader.use(); // 激活漫反射着色器
+    lightSourceShader.setFloat("uvScale", 1.0f);
     model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(-1.0, 0.5, 2.0));
-    lightObjectShader.setMat4("model", model);
+    model = glm::translate(model, glm::vec3(0.0f, 2.0f, 0.0f));  // X轴0位置
+    model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(1.0, 0.0, 0.0));
+    model = glm::scale(model, glm::vec3(2.0, 2.0, 2.0));   
+    lightSourceShader.setMat4("model", model);
+    glDrawElements(GL_TRIANGLES, containerGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+
+    // 第三个砖块（右侧）折射
+    refractShader.use(); // 激活折射着色器
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(3.0f, 2.0f, 0.0f));  // X轴+3位置
+    model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(1.0, 0.0, 0.0));
+    model = glm::scale(model, glm::vec3(2.0f));
+    refractShader.setMat4("model", model);
     glDrawElements(GL_TRIANGLES, containerGeometry.indices.size(), GL_UNSIGNED_INT, 0);
     
     glBindVertexArray(0); // 解绑VAO
     // ----------------------------------------------------------
 
-    // 绘制草丛面板
+    // 绘制草丛或透明窗户面板
     // ----------------------------------------------------------
-    glBindVertexArray(grassGeometry.VAO); // 绑定VAO
-    glBindTexture(GL_TEXTURE_2D, grassMap);
+    // glBindVertexArray(grassGeometry.VAO); // 绑定VAO
+    // glBindTexture(GL_TEXTURE_2D, grassMap);
 
-    // 对透明物体进行动态排序
-    std::map<float, glm::vec3> sorted;
-    for (unsigned int i = 0; i < grassPositions.size(); i++)
-    {
-      float distance = glm::length(camera.Position - grassPositions[i]);
-      sorted[distance] = grassPositions[i];
-    }
+    // // 激活漫反射着色器
+    // lightSourceShader.use();
 
-    for (std::map<float, glm::vec3>::reverse_iterator iterator = sorted.rbegin(); iterator != sorted.rend(); iterator++)
-    {
-      model = glm::mat4(1.0f);
-      model = glm::translate(model, iterator->second);
-      lightObjectShader.setMat4("model", model);
-      glDrawElements(GL_TRIANGLES, grassGeometry.indices.size(), GL_UNSIGNED_INT, 0);
-    }
+    // // 对透明物体进行动态排序
+    // std::map<float, glm::vec3> sorted;
+    // for (unsigned int i = 0; i < grassPositions.size(); i++)
+    // {
+    //   float distance = glm::length(camera.Position - grassPositions[i]);
+    //   sorted[distance] = grassPositions[i];
+    // }
 
-    glBindVertexArray(0); // 解绑VAO
+    // for (std::map<float, glm::vec3>::reverse_iterator iterator = sorted.rbegin(); iterator != sorted.rend(); iterator++)
+    // {
+    //   model = glm::mat4(1.0f);
+    //   model = glm::translate(model, iterator->second);
+    //   lightSourceShader.setMat4("model", model);
+    //   glDrawElements(GL_TRIANGLES, grassGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    // }
+
+    // glBindVertexArray(0); // 解绑VAO
     // ----------------------------------------------------------
 
     // 绘制灯光球体（没有使用贴图，使用灯光颜色为球体颜色）
     // ************************************************************
-    sceneShader.use();
-    // 绘制平行光位置球体
-    sceneShader.setMat4("view", view);
-    sceneShader.setMat4("projection", projection);
+    // lightObjectShader.use();
+    // // 绘制平行光位置球体
+    // lightObjectShader.setMat4("view", view);
+    // lightObjectShader.setMat4("projection", projection);
 
-    model = glm::mat4(1.0f);
-    model = glm::translate(model, lightPos); // 这里lightPos按照x轴往复运动
+    // model = glm::mat4(1.0f);
+    // model = glm::translate(model, lightPos); // 这里lightPos按照x轴往复运动
 
-    sceneShader.setMat4("model", model);
-    sceneShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+    // lightObjectShader.setMat4("model", model);
+    // lightObjectShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
-    glBindVertexArray(pointLightGeometry.VAO); // 绑定VAO
+    // glBindVertexArray(pointLightGeometry.VAO); // 绑定VAO
 
-    glDrawElements(GL_TRIANGLES, pointLightGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    // glDrawElements(GL_TRIANGLES, pointLightGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 
-    // 绘制点光源位置球体
-    for (unsigned int i = 0; i < 4; i++)
-    {
-      model = glm::mat4(1.0f);
-      model = glm::translate(model, pointLightPositions[i]);
+    // // 绘制点光源位置球体
+    // for (unsigned int i = 0; i < 4; i++)
+    // {
+    //   model = glm::mat4(1.0f);
+    //   model = glm::translate(model, pointLightPositions[i]);
 
-      sceneShader.setMat4("model", model);
-      sceneShader.setVec3("lightColor", pointLightColors[i]);
+    //   lightObjectShader.setMat4("model", model);
+    //   lightObjectShader.setVec3("lightColor", pointLightColors[i]);
 
-      glDrawElements(GL_TRIANGLES, pointLightGeometry.indices.size(), GL_UNSIGNED_INT, 0);
-    }
+    //   glDrawElements(GL_TRIANGLES, pointLightGeometry.indices.size(), GL_UNSIGNED_INT, 0);
+    // }
 
-    glBindVertexArray(0); // 解绑VAO
+    // glBindVertexArray(0); // 解绑VAO
 
     // 帧缓冲对象绘制
     // ************************************************************
@@ -880,11 +1014,17 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
         lastX = xpos;
         lastY = ypos;
 
-        glm::vec3 right = glm::normalize(glm::cross(cameraFront, cameraUp));
-        glm::vec3 up = cameraUp;
+        // glm::vec3 right = glm::normalize(glm::cross(cameraFront, cameraUp));
+        // glm::vec3 up = cameraUp;
 
-        cameraPos -= right * xoffset * sensitivity;
-        cameraPos += up * yoffset * sensitivity;
+        // 获取相机坐标系轴向量
+        glm::vec3 front = glm::normalize(camera.Front);
+        glm::vec3 right = glm::normalize(glm::cross(front, camera.WorldUp));
+        glm::vec3 up = glm::normalize(glm::cross(right, front));
+
+        // 在相机平面内平移
+        cameraPos -= right * xoffset * sensitivity; // 向左移动
+        cameraPos += up * yoffset * sensitivity; // 向上移动
         camera.Position = cameraPos;
     }
     // 更新初始位置
