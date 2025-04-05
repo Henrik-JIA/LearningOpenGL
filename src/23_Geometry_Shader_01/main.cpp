@@ -20,6 +20,11 @@
 const char *vertexShaderSource = R"(
 #version 330 core
 layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+
+out VS_OUT {
+    vec3 color;
+} vs_out;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -27,20 +32,67 @@ uniform mat4 projection;
 
 void main()
 {
+    vs_out.color = aColor;
     gl_Position = projection * view * model * vec4(aPos.x, aPos.y, aPos.z, 1.0); 
-    gl_PointSize = 15.0;
+    gl_PointSize = 15.0; // 设置点的大小
 }
+)";
+
+const char *geometryShaderSource = R"(
+#version 330 core
+layout (points) in; // 声明从顶点着色器输入的图元类型，输入的图元是点
+layout (triangle_strip, max_vertices = 5) out; // 声明几何着色器输出的图元类型为三角形带，最大顶点数为5
+
+in VS_OUT {
+    vec3 color; // 从顶点着色器传入的颜色
+} gs_in[]; // 输入的必须是一个数组，实际应为[1]，但[ ]表示自动匹配长度
+
+out vec3 fColor; // 输出颜色
+
+void build_house(vec4 position)
+{    
+    fColor = gs_in[0].color; // gs_in[0]  因为只有一个输入顶点
+
+    // 生成顶点
+    // 新生成的五个顶点均是基于输入点位置的偏移的，并且前四个顶点颜色为输入顶点的颜色，第五个顶点颜色为白色
+    // 新生成的五个顶点以三角形带triangle_strip的形式输出。
+    gl_Position = position + vec4(-0.2, -0.2, 0.0, 0.0); // 1:bottom-left   
+    EmitVertex(); // 生成顶点
+    gl_Position = position + vec4( 0.2, -0.2, 0.0, 0.0); // 2:bottom-right
+    EmitVertex();
+    gl_Position = position + vec4(-0.2,  0.2, 0.0, 0.0); // 3:top-left
+    EmitVertex();
+    gl_Position = position + vec4( 0.2,  0.2, 0.0, 0.0); // 4:top-right
+    EmitVertex();
+    
+    gl_Position = position + vec4( 0.0,  0.4, 0.0, 0.0); // 5:top
+    fColor = vec3(1.0, 1.0, 1.0); // 设置颜色
+    EmitVertex();
+
+    // 结束
+    EndPrimitive();
+}
+
+void main() {    
+    vec4 position = gl_in[0].gl_Position; // 输入点的原始位置
+    // 对每个输入的顶点都执行一般build_house函数的操作
+    build_house(position); // 这里的gl_Position我们并没有定义，是内建(Built-in)变量。
+}
+
 )";
 
 const char *fragmentShaderSource =  R"(
 #version 330 core
 out vec4 FragColor;
 
+in vec3 fColor;
+
 void main()
 {
-    FragColor = vec4(0.0, 1.0, 0.0, 1.0);   
+    FragColor = vec4(fColor, 1.0); 
 }
 )";
+
 
 
 // 函数声明
@@ -137,18 +189,17 @@ int main()
 
   // 创建着色器（包括顶点着色器、片段着色器、着色器程序、uniform设置）
   // 物体着色器
-  Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource);
-  
+  Shader ourShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource, geometryShaderSource);
+
   // // 加载模型（nanosuit）
   // Model ourModel("../static/model/nanosuit/nanosuit.obj");
 
-
   // 定义顶点
   float points[] = {
-      -0.5f,  0.5f, 0.0f, // 左上
-      0.5f,  0.5f, 0.0f, // 右上
-      0.5f, -0.5f, 0.0f, // 右下
-      -0.5f, -0.5f, 0.0f  // 左下
+      -0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, // 左上
+      0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // 右上
+      0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // 右下
+      -0.5f, -0.5f, 0.0f, 1.0f, 1.0f, 0.0f  // 左下
   };
 
   // 创建VAO、VBO
@@ -164,8 +215,10 @@ int main()
   glBufferData(GL_ARRAY_BUFFER, sizeof(points), &points, GL_STATIC_DRAW);
 
   // 顶点属性
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+  glEnableVertexAttribArray(0); // 启用顶点属性0位置
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), 0); // 设置顶点属性0的指针
+  glEnableVertexAttribArray(1); // 启用顶点属性1颜色
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float))); // 设置顶点属性1的指针
   glBindVertexArray(0);
 
 

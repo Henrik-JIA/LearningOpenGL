@@ -137,7 +137,7 @@ uniform vec3 viewPos;
 // 动态时间值（变化值）
 uniform float factor;
 // 笑脸贴图
-uniform sampler2D awesomeMap; 
+uniform sampler2D awesomeMap;
 
 // 定向光计算
 vec3 CalcDirectionLight(DirectionLight light, vec3 normal, vec3 viewDir);
