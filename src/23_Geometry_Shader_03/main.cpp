@@ -432,7 +432,7 @@ void main() {
 )";
 
 // obj物体着色器
-const char *vertexShaderSource = R"(
+const char *objVertexShaderSource = R"(
 #version 330 core
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec3 Normal;
@@ -443,10 +443,6 @@ out VS_OUT {
     vec2 vsOutTexCoord;
     vec3 vsOutFragPos;
 } vs_out;
-
-// out vec3 outNormal;
-// out vec2 outTexCoord;
-// out vec3 outFragPos;
 
 // MVP矩阵
 uniform mat4 model;
@@ -476,7 +472,7 @@ void main()
 }
 )";
 
-const char *geometryShaderSource = R"(
+const char *objGeometryShaderSource = R"(
 #version 330 core
 layout (triangles) in;
 layout (triangle_strip, max_vertices = 3) out;
@@ -513,22 +509,22 @@ void main() {
     outTexCoord = gs_in[0].vsOutTexCoord;
     outNormal = gs_in[0].vsOutNormal;
     outFragPos = gs_in[0].vsOutFragPos;
-    gl_Position = explode(gl_in[0].gl_Position, normal); // 这里必须使用面法线，而不是顶点法线，如果使用顶点法线，则效果会沿着顶点法线方向，就不会有裂开的效果。
-    // gl_Position = gl_in[0].gl_Position;
+    // gl_Position = explode(gl_in[0].gl_Position, normal); // 这里必须使用面法线，而不是顶点法线，如果使用顶点法线，则效果会沿着顶点法线方向，就不会有裂开的效果。
+    gl_Position = gl_in[0].gl_Position;
     EmitVertex();
     
     outTexCoord = gs_in[1].vsOutTexCoord;
     outNormal = gs_in[1].vsOutNormal;
     outFragPos = gs_in[1].vsOutFragPos;
-    gl_Position = explode(gl_in[1].gl_Position, normal);
-    // gl_Position = gl_in[1].gl_Position;
+    // gl_Position = explode(gl_in[1].gl_Position, normal);
+    gl_Position = gl_in[1].gl_Position;
     EmitVertex();
     
     outTexCoord = gs_in[2].vsOutTexCoord;
     outNormal = gs_in[2].vsOutNormal;
     outFragPos = gs_in[2].vsOutFragPos;
-    gl_Position = explode(gl_in[2].gl_Position, normal);
-    // gl_Position = gl_in[2].gl_Position;
+    // gl_Position = explode(gl_in[2].gl_Position, normal);
+    gl_Position = gl_in[2].gl_Position;
     EmitVertex();
     
     EndPrimitive();
@@ -536,7 +532,7 @@ void main() {
 
 )";
 
-const char *fragmentShaderSource =  R"(
+const char *objFragmentShaderSource =  R"(
 #version 330 core
 
 // 定义材质结构体，材质在各光照条件下的颜色情况
@@ -758,6 +754,67 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
 }
 )";
 
+const char *vs_normal_visualization = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+
+out VS_OUT {
+    vec3 normal;
+} vs_out;
+
+uniform mat4 view;
+uniform mat4 model;
+
+void main()
+{
+    mat3 normalMatrix = mat3(transpose(inverse(view * model)));
+    vs_out.normal = vec3(vec4(normalMatrix * aNormal, 0.0));
+    gl_Position = view * model * vec4(aPos, 1.0); 
+}
+)";
+
+const char *gs_normal_visualization = R"(
+#version 330 core
+layout (triangles) in;
+layout (line_strip, max_vertices = 6) out;
+
+in VS_OUT {
+    vec3 normal;
+} gs_in[];
+
+const float MAGNITUDE = 0.01;
+
+uniform mat4 projection;
+
+void GenerateLine(int index)
+{
+    gl_Position = projection * gl_in[index].gl_Position;
+    EmitVertex();
+    gl_Position = projection * (gl_in[index].gl_Position + vec4(gs_in[index].normal, 0.0) * MAGNITUDE);
+    EmitVertex();
+    EndPrimitive();
+}
+
+void main()
+{
+    GenerateLine(0); // first vertex normal
+    GenerateLine(1); // second vertex normal
+    GenerateLine(2); // third vertex normal
+}
+)";
+
+const char *fs_normal_visualization = R"(
+#version 330 core
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vec4(1.0, 1.0, 0.0, 1.0);
+}
+
+)";
+
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -870,7 +927,9 @@ int main()
   // 折射着色器
   Shader refractShader = Shader::FromSource(refract_object_vert, refract_object_frag);
   // obj模型着色器
-  Shader objectShader = Shader::FromSource(vertexShaderSource, fragmentShaderSource, geometryShaderSource);
+  Shader objectShader = Shader::FromSource(objVertexShaderSource, objFragmentShaderSource, objGeometryShaderSource);
+  // 法向量可视化着色器
+  Shader normalVisualizationShader = Shader::FromSource(vs_normal_visualization, fs_normal_visualization, gs_normal_visualization);
 
   float factor = 0.0;
 
@@ -1063,7 +1122,7 @@ int main()
     // obj模型着色器
     objectShader.use();
     objectShader.setFloat("factor", -factor * 0.3);
-    objectShader.setFloat("time", glfwGetTime());
+    objectShader.setFloat("time", glfwGetTime()); // 这里禁止传入时间，让三角面不随时间变化
     objectShader.setMat4("view", view); // 设置视图矩阵和投影矩阵
     objectShader.setMat4("projection", projection);
     objectShader.setVec3("viewPos", camera.Position); // 设置相机位置
@@ -1085,6 +1144,14 @@ int main()
     modelMatrix = glm::scale(modelMatrix, glm::vec3(0.25f));
     objectShader.setMat4("model", modelMatrix);
     ourModel.Draw(objectShader);
+
+    // obj模型法向量可视化
+    // --------------------------------------------------
+    normalVisualizationShader.use();
+    normalVisualizationShader.setMat4("view", view);
+    normalVisualizationShader.setMat4("projection", projection);
+    normalVisualizationShader.setMat4("model", modelMatrix);
+    ourModel.Draw(normalVisualizationShader);
 
     // --------------------------------------------------
 
