@@ -16,17 +16,19 @@
 #include <vector>
 #include "mesh.h"
 using namespace std;
-unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
+unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false, bool flip = true);
 class Model
 {
 public:
 	vector<Texture> textures_loaded; // stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
 	vector<Mesh> meshes;
 	string directory;
-	bool gammaCorrection;
+	bool gammaCorrection; // 是否使用伽马校正
+	bool flipUVs; // 是否翻转UV
 
 	// 构造函数
-	Model(string const &path, bool gamma = false) : gammaCorrection(gamma)
+	Model(string const &path, bool gamma = false, bool flipUVs = true) 
+	: gammaCorrection(gamma), flipUVs(flipUVs)
 	{
 		loadModel(path);
 	}
@@ -43,7 +45,16 @@ private:
 	{
 		// read file via ASSIMP
 		Assimp::Importer importer;
-		const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+
+		unsigned int flags = aiProcess_Triangulate | 
+							 aiProcess_GenSmoothNormals |
+							 aiProcess_CalcTangentSpace;
+		
+		if(flipUVs) { // 根据参数控制是否添加翻转标志
+				flags |= aiProcess_FlipUVs;
+			}
+
+		const aiScene *scene = importer.ReadFile(path, flags);
 		// check for errors
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
 		{
@@ -180,7 +191,7 @@ private:
 			if (!skip)
 			{ // if texture hasn't been loaded already, load it
 				Texture texture;
-				texture.id = TextureFromFile(str.C_Str(), this->directory);
+				texture.id = TextureFromFile(str.C_Str(), this->directory, gammaCorrection, !flipUVs);
 				texture.type = typeName;
 				texture.path = str.C_Str();
 				textures.push_back(texture);
@@ -191,8 +202,10 @@ private:
 	}
 };
 
-unsigned int TextureFromFile(const char *path, const string &directory, bool gamma)
+unsigned int TextureFromFile(const char *path, const string &directory, bool gamma, bool flip)
 {
+	stbi_set_flip_vertically_on_load(flip); // 设置是否翻转
+
 	string filename = string(path);
 	filename = directory + '/' + filename;
 
