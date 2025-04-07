@@ -8,6 +8,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include <tool/stb_image.h>
+
 #include <string>
 #include <fstream>
 #include <sstream>
