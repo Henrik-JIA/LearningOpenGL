@@ -291,7 +291,7 @@ bool isRightMousePressed = false;
 double lastX = SCREEN_WIDTH / 2.0f; // 鼠标上一帧的位置
 double lastY = SCREEN_HEIGHT / 2.0f;
 
-Camera camera(glm::vec3(0.0, 1.0, 6.0));
+Camera camera(SCREEN_WIDTH, SCREEN_HEIGHT, glm::vec3(0.0, 1.0, 6.0));
 
 unsigned int texColorBuffer, renderBuffer;
 
@@ -753,7 +753,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
         xoffset *= rotationSpeed;
         yoffset *= rotationSpeed;
 
-        camera.ProcessMouseMovement(xoffset, yoffset);
+        camera.ProcessRotationByOffset(xoffset, yoffset);
         cameraPos = camera.Position;
         cameraFront = camera.Front;
     }

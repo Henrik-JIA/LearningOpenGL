@@ -72,7 +72,7 @@ double lastX = SCREEN_WIDTH / 2.0f;
 double lastY = SCREEN_HEIGHT / 2.0f;
 
 // 相机系统
-Camera camera(glm::vec3(0.0f, 0.0f, 5.0f));
+Camera camera(SCREEN_WIDTH, SCREEN_HEIGHT, glm::vec3(0.0f, 0.0f, 5.0f));
 glm::vec3 cameraPos = camera.Position;
 glm::vec3 cameraFront = camera.Front;
 glm::vec3 cameraUp = camera.Up;
@@ -385,7 +385,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
         lastX = xpos;
         lastY = ypos;
 
-        camera.ProcessMouseMovement(xoffset, yoffset);
+        camera.ProcessRotationByOffset(xoffset, yoffset);
         cameraPos = camera.Position;
         cameraFront = camera.Front;
     }

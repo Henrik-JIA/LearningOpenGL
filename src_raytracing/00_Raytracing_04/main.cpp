@@ -38,6 +38,18 @@ float fov = 45.0f;
 float deltaTime = 0.0f;	// 当前帧和上一帧的时间间隔
 float lastFrame = 0.0f;
 
+const float ScreenVertices[] = {
+	//位置坐标(x,y)     //纹理坐标
+	//三角形1
+	-1.0f, 1.0f,   0.0f, 1.0f, //左上角 
+	-1.0f, -1.0f,  0.0f, 0.0f, //左下角
+	1.0f, -1.0f,   1.0f, 0.0f, //右下角
+	//三角形2
+	-1.0f,  1.0f,  0.0f, 1.0f, //左上角
+	1.0f, -1.0f,   1.0f, 0.0f, //右下角
+	1.0f,  1.0f,   1.0f, 1.0f  //右上角
+};
+
 int main()
 {
 	// GLFW初始化
@@ -73,13 +85,24 @@ int main()
 	}
 
 	// 加载着色器
-	Shader ourShader = Shader::FromFile("../src_raytracing/00_Raytracing_03/shader/vertexShader.glsl", "../src_raytracing/00_Raytracing_03/shader/fragmentShader.glsl");
+	Shader ourShader = Shader::FromFile("../src_raytracing/00_Raytracing_04/shader/vertexShader.glsl", "../src_raytracing/00_Raytracing_04/shader/fragmentShader.glsl");
 
-	// 加载模型
-	Model ourModel("../static/model/bunny/bunny.obj", false, false);
-
-	// 开启深度测试
-	glEnable(GL_DEPTH_TEST);
+	// 绑定屏幕的坐标位置
+	unsigned int VBO, VAO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(ScreenVertices), ScreenVertices, GL_STATIC_DRAW);
+	// 位置
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// 纹理
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	// Unbind VAO
+	glBindVertexArray(0);
 
 	// 渲染大循环
 	while (!glfwWindowShouldClose(window))
@@ -94,25 +117,14 @@ int main()
 
 		// 渲染
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT);
 
 		// 激活着色器
 		ourShader.use();
-		ourShader.setVec3("viewPos", cameraPos);
-
-		// 把投影矩阵传给着色器
-		glm::mat4 projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-		ourShader.setMat4("projection", projection);
-		// 相机转换
-		glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-		ourShader.setMat4("view", view);
-
-		// 渲染
-		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-		model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
-		ourShader.setMat4("model", model);
-		ourModel.Draw(ourShader);
+		
+		// 绑定VAO并开始绘制
+		glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		// 交换Buffer
 		glfwSwapBuffers(window);

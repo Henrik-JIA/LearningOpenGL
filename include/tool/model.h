@@ -8,8 +8,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include <tool/stb_image.h>
-
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -17,6 +15,10 @@
 #include <map>
 #include <vector>
 #include "mesh.h"
+
+// #define STB_IMAGE_IMPLEMENTATION
+// #include <tool/stb_image.h>
+
 using namespace std;
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false, bool flip = true);
 class Model

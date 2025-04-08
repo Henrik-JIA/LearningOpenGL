@@ -5,7 +5,8 @@
 #include <map>
 
 #include <tool/shader.h>
-#include <tool/camera.h>
+#include <tool/Camera.h>
+#include <tool/TimeRecorder.h>
 #include <geometry/BoxGeometry.h>
 #include <geometry/PlaneGeometry.h>
 #include <geometry/SphereGeometry.h>
@@ -776,16 +777,9 @@ glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
 // delta time
-float deltaTime = 0.0f;
-float lastTime = 0.0f;
+timeRecord timeRecorder;
 
-// 鼠标上一帧的位置
-bool isMousePressed = false;
-bool isRightMousePressed = false;
-double lastX = SCREEN_WIDTH / 2.0f; // 鼠标上一帧的位置
-double lastY = SCREEN_HEIGHT / 2.0f;
-
-Camera camera(glm::vec3(0.0, 1.0, 10.0));
+Camera camera(SCREEN_WIDTH, SCREEN_HEIGHT, glm::vec3(0.0, 1.0, 10.0));
 
 unsigned int texColorBuffer, renderBuffer;
 
@@ -879,7 +873,6 @@ int main()
 
   float factor = 0.0;
 
-  float fov = 45.0f; // 视锥体的角度
   
   int NR_POINT_LIGHTS = 4;
 
@@ -1001,13 +994,11 @@ int main()
   // 渲染循环
   while (!glfwWindowShouldClose(window))
   {
+    // 计算时间
+    timeRecorder.updateTime();
+
     // 处理输入
     processInput(window);
-
-    // 计算时间差，用于计算帧率以限制相机因时间变化而移动过快
-    float currentFrame = glfwGetTime();
-    deltaTime = currentFrame - lastTime;
-    lastTime = currentFrame;
 
     // 在标题中显示帧率信息
     // *************************************************************************
@@ -1053,7 +1044,7 @@ int main()
     glm::mat4 view = camera.GetViewMatrix();
     glm::mat4 projection = glm::mat4(1.0f);
     glm::mat4 model = glm::mat4(1.0f);
-    projection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+    projection = glm::perspective(glm::radians(camera.fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
 
     // 反射着色器
     reflectShader.use(); // 激活反射着色器
@@ -1331,19 +1322,19 @@ void processInput(GLFWwindow *window)
   // 相机移动
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
   {
-    camera.ProcessKeyboard(FORWARD, deltaTime);
+    camera.ProcessKeyboard(FORWARD, timeRecorder.deltaTime);
   }
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
   {
-    camera.ProcessKeyboard(BACKWARD, deltaTime);
+    camera.ProcessKeyboard(BACKWARD, timeRecorder.deltaTime);
   }
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
   {
-    camera.ProcessKeyboard(LEFT, deltaTime);
+    camera.ProcessKeyboard(LEFT, timeRecorder.deltaTime);
   }
   if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
   {
-    camera.ProcessKeyboard(RIGHT, deltaTime);
+    camera.ProcessKeyboard(RIGHT, timeRecorder.deltaTime);
   }
 }
 
@@ -1354,48 +1345,22 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
 
     // 左键：视角旋转
-    if (isMousePressed) {
-        float rotationSpeed = 3.0f;
-        float xoffset = xpos - lastX;
-        float yoffset = lastY - ypos; // 反转Y轴
-
-        lastX = xpos;
-        lastY = ypos;
-
-        // 设置旋转速度
-        xoffset *= rotationSpeed;
-        yoffset *= rotationSpeed;
-
-        camera.ProcessMouseMovement(xoffset, yoffset);
+    if (camera.isRotating) {
+        camera.RotationSensitivity = 0.2f;
+        camera.ProcessRotationByPosition(xpos, ypos);  // 直接传入当前坐标
         cameraPos = camera.Position;
         cameraFront = camera.Front;
     }
     // 右键：视角平移
-    else if (isRightMousePressed) {
-        float sensitivity = 0.02f;
-        float xoffset = xpos - lastX;
-        float yoffset = ypos - lastY;
-
-        lastX = xpos;
-        lastY = ypos;
-
-        // glm::vec3 right = glm::normalize(glm::cross(cameraFront, cameraUp));
-        // glm::vec3 up = cameraUp;
-
-        // 获取相机坐标系轴向量
-        glm::vec3 front = glm::normalize(camera.Front);
-        glm::vec3 right = glm::normalize(glm::cross(front, camera.WorldUp));
-        glm::vec3 up = glm::normalize(glm::cross(right, front));
-
-        // 在相机平面内平移
-        cameraPos -= right * xoffset * sensitivity; // 向左移动
-        cameraPos += up * yoffset * sensitivity; // 向上移动
-        camera.Position = cameraPos;
+    else if (camera.isPanning) {      
+        camera.PanSensitivity = 0.02f;
+        camera.ProcessPanByPosition(xpos, ypos);
+        cameraPos = camera.Position;
     }
     // 更新初始位置
     else {
-        lastX = xpos;
-        lastY = ypos;
+        camera.lastX = xpos;
+        camera.lastY = ypos;
     }
 }
 
@@ -1408,19 +1373,19 @@ void mouse_button_calback(GLFWwindow *window, int button, int action, int mods)
   // 左键处理
   if (button == GLFW_MOUSE_BUTTON_LEFT) {
       if (action == GLFW_PRESS) {
-          isMousePressed = true;
-          glfwGetCursorPos(window, &lastX, &lastY);
+          camera.isRotating = true;
+          glfwGetCursorPos(window, &camera.lastX, &camera.lastY);
       } else if (action == GLFW_RELEASE) {
-          isMousePressed = false;
+          camera.isRotating = false;
       }
   }
   // 右键处理
   else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
       if (action == GLFW_PRESS) {
-          isRightMousePressed = true;
-          glfwGetCursorPos(window, &lastX, &lastY);
+          camera.isPanning = true;
+          glfwGetCursorPos(window, &camera.lastX, &camera.lastY);
       } else if (action == GLFW_RELEASE) {
-          isRightMousePressed = false;
+          camera.isPanning = false;
       }
   }
 }
@@ -1526,7 +1491,7 @@ void drawSkyBox(Shader& shader, BoxGeometry& geometry, unsigned int& cubeMap)
 
     shader.use();
     glm::mat4 view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // 移除平移分量
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
 
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);

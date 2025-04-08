@@ -456,7 +456,7 @@ bool isRightMousePressed = false;
 double lastX = SCREEN_WIDTH / 2.0f; // 鼠标上一帧的位置
 double lastY = SCREEN_HEIGHT / 2.0f;
 
-Camera camera(glm::vec3(0.0, 1.0, 10.0));
+Camera camera(SCREEN_WIDTH, SCREEN_HEIGHT, glm::vec3(0.0, 1.0, 10.0));
 
 unsigned int texColorBuffer, renderBuffer;
 
@@ -1001,7 +1001,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
         xoffset *= rotationSpeed;
         yoffset *= rotationSpeed;
 
-        camera.ProcessMouseMovement(xoffset, yoffset);
+        camera.ProcessRotationByOffset(xoffset, yoffset);
         cameraPos = camera.Position;
         cameraFront = camera.Front;
     }
@@ -1161,7 +1161,7 @@ void drawSkyBox(Shader& shader, BoxGeometry& geometry, unsigned int& cubeMap)
 
     shader.use();
     glm::mat4 view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // 移除平移分量
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
 
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);

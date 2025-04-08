@@ -19,15 +19,19 @@ enum Camera_Movement
 // Default camera values
 const float YAW = -90.0f;
 const float PITCH = 0.0f;
-const float SPEED = 2.5f;
-const float SENSITIVITY = 0.1f;
-const float ZOOM = 45.0f;
+const float KEYBOARD_MOVEMENT_SPEED = 2.5f;
+const float ROTATION_SENSITIVITY = 0.2f;
+const float PAN_SENSITIVITY = 0.02f;
+const float FOV = 45.0f; // ZOOM
 
 // An abstract camera class that processes input and calculates the corresponding Euler Angles, Vectors and Matrices for use in OpenGL
 class Camera
 {
 public:
-	// camera Attributes
+	// 屏幕宽高
+	int ScreenWidth;
+	int ScreenHeight;
+	// 相机属性
 	glm::vec3 Position;
 	glm::vec3 Front;
 	glm::vec3 Up;
@@ -37,20 +41,50 @@ public:
 	float Yaw;
 	float Pitch;
 	// camera options
-	float MovementSpeed;
-	float MouseSensitivity;
-	float Zoom;
+	float KeyBoardMovementSpeed;
+	float RotationSensitivity;
+	float PanSensitivity;
+	float fov;
+
+	// 鼠标上一帧的位置
+	bool isRotating;
+	bool isPanning;
+	double lastX;
+	double lastY;
+
+	// 屏幕宽高比
+	float ScreenRatio;
+	// 屏幕宽高的一半
+	float halfH;
+	float halfW;
+	// 屏幕左下角坐标
+	glm::vec3 LeftBottomCorner;
 
 	// 构造函数1：使用向量参数
 	// 位置
 	// 上方向：Y轴
 	// 默认值YAW = -90.0f，初始朝Z负方向
 	// 默认值PITCH = 0.0f，平视
-	Camera( glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), 
+	Camera( int ScreenWidth, 
+			int ScreenHeight,
+			glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), 
 			glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), 
 			float yaw = YAW, 
 			float pitch = PITCH
-		) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
+		) : ScreenWidth(ScreenWidth),
+			ScreenHeight(ScreenHeight),
+			ScreenRatio(ScreenWidth / ScreenHeight),
+			halfH(glm::tan(glm::radians(fov))),
+			halfW(halfH * ScreenRatio),
+			Front(glm::vec3(0.0f, 0.0f, -1.0f)), 
+			KeyBoardMovementSpeed(KEYBOARD_MOVEMENT_SPEED), 
+			RotationSensitivity(ROTATION_SENSITIVITY),
+			PanSensitivity(PAN_SENSITIVITY),
+			fov(FOV),
+			isRotating(false),
+			isPanning(false),
+			lastX(ScreenWidth / 2.0f),
+			lastY(ScreenHeight / 2.0f)
 	{
 		// 直接使用传入的向量
 		Position = position;
@@ -61,10 +95,25 @@ public:
 	}
 
 	// 构造函数2：使用标量参数
-	Camera( float posX, float posY, float posZ, // 相机位置坐标分量（X,Y,Z）
+	Camera( int ScreenWidth, 
+			int ScreenHeight,
+		    float posX, float posY, float posZ, // 相机位置坐标分量（X,Y,Z）
 			float upX, float upY, float upZ, // 上方向向量分量（X,Y,Z）
 			float yaw, float pitch // 欧拉角（无默认值）
-		) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
+		) : ScreenWidth(ScreenWidth),
+			ScreenHeight(ScreenHeight),
+			ScreenRatio(ScreenWidth / ScreenHeight),
+			halfH(glm::tan(glm::radians(fov))),
+			halfW(halfH * ScreenRatio),
+			Front(glm::vec3(0.0f, 0.0f, -1.0f)), 
+			KeyBoardMovementSpeed(KEYBOARD_MOVEMENT_SPEED), 
+			RotationSensitivity(ROTATION_SENSITIVITY),
+			PanSensitivity(PAN_SENSITIVITY),
+			fov(FOV),
+			isRotating(false),
+			isPanning(false),
+			lastX(ScreenWidth / 2.0f),
+			lastY(ScreenWidth / 2.0f)
 	{
 		// 用标量参数构造向量
 		Position = glm::vec3(posX, posY, posZ);
@@ -84,7 +133,7 @@ public:
 	// processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
 	void ProcessKeyboard(Camera_Movement direction, float deltaTime)
 	{
-		float velocity = MovementSpeed * deltaTime;
+		float velocity = KeyBoardMovementSpeed * deltaTime;
 		if (direction == FORWARD)
 			Position += Front * velocity;
 		if (direction == BACKWARD)
@@ -94,14 +143,27 @@ public:
 		if (direction == RIGHT)
 			Position += Right * velocity;
 
-		// Position.y = 0.0f;
+		LeftBottomCorner = Front - halfW * Right - halfH * Up;
 	}
 
+	// 直接处理绝对坐标的版本，用于鼠标旋转
+    void ProcessRotationByPosition(float xpos, float ypos) {
+        if(!isRotating) return; // 状态检查
+        
+        float xoffset = xpos - lastX;
+        float yoffset = lastY - ypos; // 注意Y轴方向反转
+        
+        updateMousePosition(xpos, ypos); 
+        ProcessRotationByOffset(xoffset, yoffset);
+    }
+
+	// 鼠标移动，使用偏移量
 	// processes input received from a mouse input system. Expects the offset value in both the x and y direction.
-	void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
+	void ProcessRotationByOffset(float xoffset, float yoffset, GLboolean constrainPitch = true)
 	{
-		xoffset *= MouseSensitivity;
-		yoffset *= MouseSensitivity;
+		// 直接使用类成员变量控制灵敏度
+		xoffset *= RotationSensitivity;
+		yoffset *= RotationSensitivity;
 
 		Yaw += xoffset;
 		Pitch += yoffset;
@@ -119,14 +181,66 @@ public:
 		updateCameraVectors();
 	}
 
+	// 直接处理绝对坐标的版本，用于鼠标平移
+	void ProcessPanByPosition(float xpos, float ypos) 
+	{
+        if(!isPanning) return; // 状态检查
+        
+        float xoffset = xpos - lastX;
+        float yoffset = ypos - lastY; // 注意这里Y轴方向与旋转不同
+        
+        updateMousePosition(xpos, ypos); 
+        ProcessPanByOffset(xoffset, yoffset);
+    }
+
+	// 鼠标平移，使用偏移量
+	void ProcessPanByOffset(float xoffset, float yoffset) {
+		xoffset *= PanSensitivity;
+        yoffset *= PanSensitivity;
+
+        glm::vec3 right = glm::normalize(glm::cross(Front, WorldUp));
+        glm::vec3 up = glm::normalize(glm::cross(right, Front));
+        
+        Position -= right * xoffset;
+        Position += up * yoffset;
+	}
+
 	// processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
 	void ProcessMouseScroll(float yoffset)
 	{
-		Zoom -= (float)yoffset;
-		if (Zoom < 1.0f)
-			Zoom = 1.0f;
-		if (Zoom > 45.0f)
-			Zoom = 45.0f;
+		fov -= (float)yoffset;
+		if (fov < 1.0f)
+			fov = 1.0f;
+		if (fov > 45.0f)
+			fov = 45.0f;
+	}
+
+	// 更新屏幕宽高比
+	void updateScreenRatio(int ScreenWidth, int ScreenHeight) {
+		ScreenRatio = (float)ScreenWidth / (float)ScreenHeight;
+		halfW = halfH * ScreenRatio;
+
+		LeftBottomCorner = Front - halfW * Right - halfH * Up;
+	}
+
+	// 更新视野
+	void updateFov(float offset) {
+		fov -= (float)offset;
+		if (fov < 1.0f)
+			fov = 1.0f;
+		if (fov > 45.0f)
+			fov = 45.0f;
+
+		halfH = glm::tan(glm::radians(fov));
+		halfW = halfH * ScreenRatio;
+
+		LeftBottomCorner = Front - halfW * Right - halfH * Up;
+	}
+
+	// 更新鼠标位置
+	void updateMousePosition(float x, float y) {
+		lastX = x;
+		lastY = y;
 	}
 
 private:
@@ -142,6 +256,9 @@ private:
 		// also re-calculate the Right and Up vector
 		Right = glm::normalize(glm::cross(Front, WorldUp)); // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
 		Up = glm::normalize(glm::cross(Right, Front));
+	
+		LeftBottomCorner = Front - halfW * Right - halfH * Up;
 	}
+
 };
 #endif

@@ -367,7 +367,7 @@ float fov = 60.0f;
 ImVec4 clear_color = ImVec4(0.2f, 0.2f, 0.2f, 1.00f);
 
 // 相机系统
-Camera camera(glm::vec3(0.0f, 1.0f, 6.0f)); // 相机类
+Camera camera(SCREEN_WIDTH, SCREEN_HEIGHT, glm::vec3(0.0f, 1.0f, 6.0f)); // 相机类
 glm::vec3 cameraPos = camera.Position; // 相机位置
 glm::vec3 cameraFront = camera.Front; // 相机前向
 glm::vec3 cameraUp = camera.Up; // 相机上向
@@ -868,7 +868,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
         xoffset *= rotationSpeed;
         yoffset *= rotationSpeed;
 
-  camera.ProcessMouseMovement(xoffset, yoffset);
+  camera.ProcessRotationByOffset(xoffset, yoffset);
         cameraPos = camera.Position;
         cameraFront = camera.Front;
     }
