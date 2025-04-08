@@ -7,6 +7,7 @@ uniform int screenWidth;
 uniform int screenHeight;
 
 uniform vec3 lookat;
+
 struct Camera {
 	vec3 camPos;
 	vec3 front;
@@ -16,7 +17,7 @@ struct Camera {
 	float halfW;
 	vec3 leftbottom;
 };
-uniform struct Camera camera;
+uniform Camera camera;
 
 uint wseed;
 float randcore(uint seed) {

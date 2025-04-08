@@ -26,7 +26,7 @@ unsigned int SCR_HEIGHT = 600;
 
 timeRecord timeRecorder;
 
-Camera cam(SCR_WIDTH, SCR_HEIGHT);
+Camera cam(SCR_WIDTH, SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 3.0f));
 
 int main()
 {
@@ -136,7 +136,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 	float xpos = static_cast<float>(xposIn);
 	float ypos = static_cast<float>(yposIn);
-	cam.updateCameraFront(xpos, ypos);
+	cam.ProcessRotationByPosition(xpos, ypos);
 }
 
 // 设置fov
