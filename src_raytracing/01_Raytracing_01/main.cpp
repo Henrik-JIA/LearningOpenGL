@@ -1,18 +1,20 @@
-#include "../glad/glad.h"
-#include "../GLFW/glfw3.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
-#include "../glm/glm.hpp"
-#include "../glm/gtc/matrix_transform.hpp"
-#include "../glm/gtc/type_ptr.hpp"
-
-#include "../Source/Shader.h"
-#include "../Source/Mesh.h"
-#include "../Source/Model.h"
-#include "../Source/Camera.h"
-#include "../Source/RT_Screen.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../Tool/stb_image.h"
+#include <tool/stb_image.h>
+
+#include <tool/Shader.h>
+#include <tool/Camera.h>
+#include <tool/TimeRecorder.h>
+#include <tool/ScreenFBO.h>
+#include <tool/Mesh.h>
+#include <tool/Model.h>
+#include <geometry/RT_Screen_2D.h>
 
 #include <iostream>
 
@@ -24,12 +26,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 unsigned int SCR_WIDTH = 800;
 unsigned int SCR_HEIGHT = 600;
 
-timeRecord time;
+timeRecord timeRecorder;
 
-Camera cam(SCR_WIDTH, SCR_HEIGHT);
+Camera cam(SCR_WIDTH, SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 3.0f));
 
 ScreenFBO screenBuffer;
-
 
 int main()
 {
@@ -68,8 +69,8 @@ int main()
 	}
 
 	// 加载着色器
-	Shader RayTracerShader("./Source/RayTracerVertexShader.glsl", "./Source/RayTracerFragmentShader.glsl");
-	Shader ScreenShader("./Source/ScreenVertexShader.glsl", "./Source/ScreenFragmentShader.glsl");
+	Shader RayTracerShader = Shader::FromFile("../src_raytracing/01_Raytracing_01/shader/RayTracerVertexShader.glsl", "../src_raytracing/01_Raytracing_01/shader/RayTracerFragmentShader.glsl");
+	Shader ScreenShader = Shader::FromFile("../src_raytracing/01_Raytracing_01/shader/ScreenVertexShader.glsl", "../src_raytracing/01_Raytracing_01/shader/ScreenFragmentShader.glsl");
 
 	// 绑定屏幕的坐标位置
 	RT_Screen screen;
@@ -82,7 +83,7 @@ int main()
 	while (!glfwWindowShouldClose(window))
 	{
 		// 计算时间
-		time.updateTime();
+		timeRecorder.updateTime();
 
 		// 输入
 		processInput(window);
@@ -95,10 +96,10 @@ int main()
 
 			// 激活着色器
 			RayTracerShader.use();
-			RayTracerShader.setVec3("camera.camPos", cam.cameraPos);
-			RayTracerShader.setVec3("camera.front", cam.cameraFront);
-			RayTracerShader.setVec3("camera.right", cam.cameraRight);
-			RayTracerShader.setVec3("camera.up", cam.cameraUp);
+			RayTracerShader.setVec3("camera.camPos", cam.Position);
+			RayTracerShader.setVec3("camera.front", cam.Front);
+			RayTracerShader.setVec3("camera.right", cam.Right);
+			RayTracerShader.setVec3("camera.up", cam.Up);
 
 			RayTracerShader.setFloat("camera.halfH", cam.halfH);
 			RayTracerShader.setFloat("camera.halfW", cam.halfW);
@@ -147,13 +148,13 @@ void processInput(GLFWwindow *window) {
 		glfwSetWindowShouldClose(window, true);
 
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		cam.ProcessKeyboard(FORWARD, time.deltaTime);
+		cam.ProcessKeyboard(FORWARD, timeRecorder.deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		cam.ProcessKeyboard(BACKWARD, time.deltaTime);
+		cam.ProcessKeyboard(BACKWARD, timeRecorder.deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		cam.ProcessKeyboard(LEFT, time.deltaTime);
+		cam.ProcessKeyboard(LEFT, timeRecorder.deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		cam.ProcessKeyboard(RIGHT, time.deltaTime);
+		cam.ProcessKeyboard(RIGHT, timeRecorder.deltaTime);
 }
 
 // 处理窗口尺寸变化
@@ -168,7 +169,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 	float xpos = static_cast<float>(xposIn);
 	float ypos = static_cast<float>(yposIn);
-	cam.updateCameraFront(xpos, ypos);
+	cam.ProcessRotationByPosition(xpos, ypos);
 }
 
 // 设置fov

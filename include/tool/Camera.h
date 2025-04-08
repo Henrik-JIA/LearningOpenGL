@@ -60,6 +60,9 @@ public:
 	// 屏幕左下角坐标
 	glm::vec3 LeftBottomCorner;
 
+	// 光线追踪的循环次数
+	int LoopNum;
+
 	// 构造函数1：使用向量参数
 	// 位置
 	// 上方向：Y轴
@@ -81,6 +84,7 @@ public:
 			RotationSensitivity(ROTATION_SENSITIVITY),
 			PanSensitivity(PAN_SENSITIVITY),
 			fov(FOV),
+			LoopNum(0),
 			isRotating(false),
 			isPanning(false),
 			lastX(ScreenWidth / 2.0f),
@@ -110,6 +114,7 @@ public:
 			RotationSensitivity(ROTATION_SENSITIVITY),
 			PanSensitivity(PAN_SENSITIVITY),
 			fov(FOV),
+			LoopNum(0),
 			isRotating(false),
 			isPanning(false),
 			lastX(ScreenWidth / 2.0f),
@@ -144,6 +149,7 @@ public:
 			Position += Right * velocity;
 
 		LeftBottomCorner = Front - halfW * Right - halfH * Up;
+		LoopNum = 0;
 	}
 
 	// 直接处理绝对坐标的版本，用于鼠标旋转
@@ -203,6 +209,11 @@ public:
         
         Position -= right * xoffset;
         Position += up * yoffset;
+
+		// 需要补充的更新
+		// LeftBottomCorner = Front - halfW * Right - halfH * Up;
+		// 或者调用完整更新
+		updateCameraVectors(); 
 	}
 
 	// processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
@@ -213,6 +224,13 @@ public:
 			fov = 1.0f;
 		if (fov > 45.0f)
 			fov = 45.0f;
+
+		halfH = glm::tan(glm::radians(fov));
+		halfW = halfH * ScreenRatio;
+
+		LeftBottomCorner = Front - halfW * Right - halfH * Up;
+
+		LoopNum = 0;
 	}
 
 	// 更新屏幕宽高比
@@ -221,6 +239,8 @@ public:
 		halfW = halfH * ScreenRatio;
 
 		LeftBottomCorner = Front - halfW * Right - halfH * Up;
+
+		LoopNum = 0;
 	}
 
 	// 更新视野
@@ -235,6 +255,7 @@ public:
 		halfW = halfH * ScreenRatio;
 
 		LeftBottomCorner = Front - halfW * Right - halfH * Up;
+		LoopNum = 0;
 	}
 
 	// 更新鼠标位置
@@ -258,6 +279,7 @@ private:
 		Up = glm::normalize(glm::cross(Right, Front));
 	
 		LeftBottomCorner = Front - halfW * Right - halfH * Up;
+		LoopNum = 0;
 	}
 
 };

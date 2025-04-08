@@ -6,7 +6,7 @@ in vec2 TexCoords;
 struct Camera {
 	int LoopNum;
 };
-uniform struct Camera camera;
+uniform Camera camera;
 
 uniform sampler2D screenTexture;
 

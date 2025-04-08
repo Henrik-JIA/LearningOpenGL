@@ -15,7 +15,7 @@ struct Camera {
 	float halfW;
 	vec3 leftbottom;
 };
-uniform struct Camera camera;
+uniform Camera camera;
 
 uint wseed;
 float randcore(uint seed) {

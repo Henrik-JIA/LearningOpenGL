@@ -46,6 +46,10 @@ public:
 		glBindVertexArray(VAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
+	void Delete() {
+		glDeleteBuffers(1, &VBO);
+		glDeleteVertexArrays(1, &VAO);
+	}
 private:
 	unsigned int VBO, VAO;
 

@@ -31,7 +31,7 @@ file(GLOB SOURCES
 
 # 添加可执行文件
 add_executable(
-    main src_raytracing/00_Raytracing_06/main.cpp
+    main src_raytracing/01_Raytracing_01/main.cpp
     ${SOURCES}
 )
 # main src_rasterization/24_Instancing_03/main.cpp
