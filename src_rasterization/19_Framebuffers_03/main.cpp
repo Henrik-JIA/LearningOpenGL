@@ -240,8 +240,13 @@ layout(location = 1) in vec3 Normal;
 layout(location = 2) in vec2 TexCoords;
 out vec2 outTexCoord;
 
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
 void main() {
-  gl_Position = vec4(Position.x, Position.y, 0.0f, 1.0f);
+  // gl_Position = projection * view * model * vec4(Position, 1.0f);
+  gl_Position = model * vec4(Position, 1.0f);
   outTexCoord = TexCoords;
 }
 
@@ -688,9 +693,22 @@ int main()
     //绘制创建的帧缓冲屏幕窗口
     frameBufferShader.use();
 
+    // glm::mat4 frameView = camera.GetViewMatrix();
+    // glm::mat4 frameProjection = glm::mat4(1.0f);
+    // frameProjection = glm::perspective(glm::radians(fov), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+    // frameBufferShader.setMat4("view", frameView);
+    // frameBufferShader.setMat4("projection", frameProjection);
+    glm::mat4 frameModel = glm::mat4(1.0f);
+    frameModel = glm::rotate(frameModel, glm::radians(45.0f), glm::vec3(0.0, 0.0, 1.0)); // 绕Z轴旋转45度
+    frameBufferShader.setMat4("model", frameModel);
+
     glBindVertexArray(frameGeometry.VAO); // 绑定VAO
    
+    // glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+    frameBufferShader.setInt("screenTexture", 0); // 新增这行
 
     glDrawElements(GL_TRIANGLES, frameGeometry.indices.size(), GL_UNSIGNED_INT, 0);
 

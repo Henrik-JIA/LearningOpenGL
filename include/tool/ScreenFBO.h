@@ -5,6 +5,10 @@
 
 #include <glad/glad.h>
 
+#include <iostream>
+
+using namespace std;
+
 class ScreenFBO {
 public:
 	// 构造函数
@@ -34,8 +38,14 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // 设置纹理环绕方式
 
 		// 3. 将颜色纹理附加到当前绑定的帧缓冲对象
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
-
+		glFramebufferTexture2D(
+			GL_FRAMEBUFFER,          // 目标帧缓冲类型
+			GL_COLOR_ATTACHMENT0,    // 颜色附件编号（0号颜色附件）
+			GL_TEXTURE_2D,           // 纹理类型
+			textureColorbuffer,      // 要附加的纹理对象
+			0                        // Mipmap级别
+		);
+		
 		// 4. 创建渲染缓冲对象(用于深度和模板测试)
 		glGenRenderbuffers(1, &rbo); // 生成渲染缓冲
 		glBindRenderbuffer(GL_RENDERBUFFER, rbo); // 绑定渲染缓冲
@@ -56,26 +66,30 @@ public:
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
+	// 绑定帧缓冲
 	void Bind() {
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_DEPTH_TEST); // 禁用深度测试
 	}
 
+	// 解绑帧缓冲
 	void unBind() {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
+	// 绑定帧缓冲为纹理
 	void BindAsTexture() {
 		// 作为第0个纹理
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
 	}
 
+	// 删除帧缓冲
 	void Delete() {
 		// 删除
-		unBind();
-		glDeleteFramebuffers(1, &framebuffer);
-		glDeleteTextures(1, &textureColorbuffer);
+		unBind(); // 解绑帧缓冲
+		glDeleteFramebuffers(1, &framebuffer); // 删除帧缓冲
+		glDeleteTextures(1, &textureColorbuffer); // 删除颜色纹理
 	}
 
 };

@@ -34,8 +34,8 @@ add_executable(
     main src_raytracing/01_Raytracing_01/main.cpp
     ${SOURCES}
 )
-# main src_rasterization/24_Instancing_03/main.cpp
-# main src_raytracing/00_Raytracing_05/main.cpp
+# main src_rasterization/19_Framebuffers_03/main.cpp
+# main src_raytracing/01_Raytracing_01/main.cpp
 
 # 链接第三方库
 target_link_libraries(main

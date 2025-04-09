@@ -69,7 +69,9 @@ int main()
 	}
 
 	// 加载着色器
+	// 光线追踪着色器，用于获得当前帧的结果
 	Shader RayTracerShader = Shader::FromFile("../src_raytracing/01_Raytracing_01/shader/RayTracerVertexShader.glsl", "../src_raytracing/01_Raytracing_01/shader/RayTracerFragmentShader.glsl");
+	// 屏幕着色器，用于将当前帧与历史帧的结果合并，并显示到屏幕上。
 	Shader ScreenShader = Shader::FromFile("../src_raytracing/01_Raytracing_01/shader/ScreenVertexShader.glsl", "../src_raytracing/01_Raytracing_01/shader/ScreenFragmentShader.glsl");
 
 	// 绑定屏幕的坐标位置
@@ -90,11 +92,12 @@ int main()
 
 		// 渲染
 		{
-			screenBuffer.Bind();
+			screenBuffer.Bind(); // 绑定自定义的帧缓冲
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
 
-			// 激活着色器
+			// 设置光线追踪着色器参数
+			// 激活光线追踪着色器，获得当前帧的结果
 			RayTracerShader.use();
 			RayTracerShader.setVec3("camera.camPos", cam.Position);
 			RayTracerShader.setVec3("camera.front", cam.Front);
@@ -107,7 +110,9 @@ int main()
 			RayTracerShader.setVec3("camera.leftbottom", cam.LeftBottomCorner);
 
 			// 渲染FrameBuffer
-			screen.DrawScreen();
+			screen.DrawScreen(); // 绘制到帧缓冲纹理
+			
+			// 解绑帧缓冲
 			screenBuffer.unBind();
 		}
 
@@ -116,6 +121,7 @@ int main()
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
 
+			// 激活屏幕着色器，将当前帧与历史帧的结果合并，并显示到屏幕上。
 			ScreenShader.use();
 			screenBuffer.BindAsTexture();
 			// screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的screenTexture为纹理0
@@ -123,9 +129,9 @@ int main()
 
 			ScreenShader.setInt("camera.LoopNum", cam.LoopNum);
 
+			// 再绘制一次屏幕，将当前帧与历史帧的结果合并，并显示到屏幕上。
 			screen.DrawScreen();
 		}
-
 
 		// 交换Buffer
 		glfwSwapBuffers(window);
