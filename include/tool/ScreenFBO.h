@@ -60,10 +60,15 @@ public:
 			// 没有正确实现，则报错
 			std::cout << "ERROR:Framebuffer is not complete!" << std::endl;
 		}
+		// else {
+		//     // 添加资源ID输出
+		// 	std::cout << "Created FBO: " << framebuffer 
+        //      << " | Texture: " << textureColorbuffer
+        //      << " | RBO: " << rbo << std::endl;
+		// }
 
 		// 7. 解绑帧缓冲（将帧缓冲对象绑定到默认帧缓存上）绑定到默认FrameBuffer
-		// unBind();
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		unBind();
 	}
 
 	// 绑定帧缓冲
@@ -77,10 +82,11 @@ public:
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
-	// 绑定帧缓冲为纹理
+	// 绑定帧缓冲为纹理，做为纹理使用
 	void BindAsTexture() {
 		// 作为第0个纹理
 		glActiveTexture(GL_TEXTURE0);
+		// 绑定纹理
 		glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
 	}
 

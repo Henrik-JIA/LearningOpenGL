@@ -40,12 +40,28 @@ public:
 		// Unbind VAO
 		glBindVertexArray(0);
 	}
-	// 绘制屏幕
+
+	// 这两个函数执行时的上下文状态不同导致结果不同
+	// -----------------------------------------------
+	// 写入帧缓冲
+	void RenderToFramebuffer() { 
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
+	// 绘制纹理四边形
+	void DrawTextureQuad() { 
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
+	// -----------------------------------------------
+
 	void DrawScreen() {
 		// 绑定VAO并开始绘制
 		glBindVertexArray(VAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
+
+	// 删除VAO和VBO
 	void Delete() {
 		glDeleteBuffers(1, &VBO);
 		glDeleteVertexArrays(1, &VAO);

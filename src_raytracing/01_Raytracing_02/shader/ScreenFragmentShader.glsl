@@ -3,12 +3,6 @@ out vec4 FragColor;
 
 in vec2 TexCoords;
 
-struct Camera {
-	int LoopNum;
-};
-
-uniform Camera camera;
-
 uniform sampler2D screenTexture;
 
 void main() {

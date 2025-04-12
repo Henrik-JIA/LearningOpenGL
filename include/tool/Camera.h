@@ -70,7 +70,7 @@ public:
 	// 默认值PITCH = 0.0f，平视
 	Camera( int ScreenWidth, 
 			int ScreenHeight,
-			glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), 
+			glm::vec3 position = glm::vec3(0.0f, 0.0f, 5.0f), 
 			glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), 
 			float yaw = YAW, 
 			float pitch = PITCH
@@ -262,6 +262,11 @@ public:
 	void updateMousePosition(float x, float y) {
 		lastX = x;
 		lastY = y;
+	}
+
+	// 渲染循环加1
+	void LoopIncrease() {
+		LoopNum++;
 	}
 
 private:

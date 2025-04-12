@@ -9,12 +9,14 @@
 #include <tool/stb_image.h>
 
 #include <tool/Shader.h>
-#include <tool/Camera.h>
-#include <tool/TimeRecorder.h>
-#include <tool/ScreenFBO.h>
 #include <tool/Mesh.h>
 #include <tool/Model.h>
+#include <tool/Camera.h>
+#include <tool/RandomUtils.h>
+#include <tool/TimeRecorder.h>
+#include <tool/RenderBuffer.h>
 #include <geometry/RT_Screen_2D.h>
+
 
 #include <iostream>
 
@@ -26,11 +28,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 unsigned int SCR_WIDTH = 800;
 unsigned int SCR_HEIGHT = 600;
 
-timeRecord timeRecorder;
+timeRecord tRecord;
 
-Camera cam(SCR_WIDTH, SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 3.0f));
+Camera cam(SCR_WIDTH, SCR_HEIGHT);
 
-ScreenFBO screenBuffer;
+RenderBuffer screenBuffer;
 
 int main()
 {
@@ -68,78 +70,80 @@ int main()
 		return -1;
 	}
 
+	// CPU随机数初始化
+	CPURandomInit();
+
 	// 加载着色器
-	// 光线追踪着色器，用于获得当前帧的结果
-	Shader RayTracerShader = Shader::FromFile("../src_raytracing/01_Raytracing_01/shader/RayTracerVertexShader.glsl", "../src_raytracing/01_Raytracing_01/shader/RayTracerFragmentShader.glsl");
-	// 屏幕着色器，用于将当前帧与历史帧的结果合并，并显示到屏幕上。
-	Shader ScreenShader = Shader::FromFile("../src_raytracing/01_Raytracing_01/shader/ScreenVertexShader.glsl", "../src_raytracing/01_Raytracing_01/shader/ScreenFragmentShader.glsl");
+	Shader RayTracerShader = Shader::FromFile("../src_raytracing/01_Raytracing_02/shader/RayTracerVertexShader.glsl", "../src_raytracing/01_Raytracing_02/shader/RayTracerFragmentShader.glsl");
+	Shader ScreenShader = Shader::FromFile("../src_raytracing/01_Raytracing_02/shader/ScreenVertexShader.glsl", "../src_raytracing/01_Raytracing_02/shader/ScreenFragmentShader.glsl");
 
 	// 绑定屏幕的坐标位置
 	RT_Screen screen;
 	screen.InitScreenBind();
 
 	// 生成屏幕FrameBuffer
-	screenBuffer.configuration(SCR_WIDTH, SCR_HEIGHT);
+	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
 	
 	// 渲染大循环
 	while (!glfwWindowShouldClose(window))
 	{
 		// 计算时间
-		timeRecorder.updateTime();
+		tRecord.updateTime();
 
 		// 输入
 		processInput(window);
 
-		// 渲染
+		// 渲染循环加1
+		cam.LoopIncrease();
+
+		// 光线追踪渲染当前帧
 		{
-			// 绑定自定义FBO
-			screenBuffer.Bind(); // 绑定自定义的帧缓冲
+			// 绑定到当前帧缓冲区
+			screenBuffer.setCurrentBuffer(cam.LoopNum);
 
-			// 清除颜色缓冲区
-			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT);
-
-			// 设置光线追踪着色器参数
-			// 激活光线追踪着色器，获得当前帧的结果
-			RayTracerShader.use(); // 使用光线追踪着色器
+			// 激活着色器
+			RayTracerShader.use();
+			// screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的historyTexture为纹理0
+			RayTracerShader.setInt("historyTexture", 0);
 
 			RayTracerShader.setVec3("camera.camPos", cam.Position);
 			RayTracerShader.setVec3("camera.front", cam.Front);
 			RayTracerShader.setVec3("camera.right", cam.Right);
 			RayTracerShader.setVec3("camera.up", cam.Up);
-
+			
 			RayTracerShader.setFloat("camera.halfH", cam.halfH);
 			RayTracerShader.setFloat("camera.halfW", cam.halfW);
-
+			
 			RayTracerShader.setVec3("camera.leftbottom", cam.LeftBottomCorner);
-
+			
+			RayTracerShader.setInt("camera.LoopNum", cam.LoopNum);
+			
+			RayTracerShader.setFloat("randOrigin", 674764.0f * (GetCPURandom() + 1.0f));
+			
 			// 绘制到FBO的textureColorbuffer
 			screen.RenderToFramebuffer(); // 明确表示这是渲染到FBO，绘制到帧缓冲纹理
-			
-			// 解绑帧缓冲
+
+			// 解绑帧缓冲，解绑到默认帧缓冲
 			screenBuffer.unBind();
 		}
 
 		// 渲染到默认Buffer上
-		{
-			// 清除颜色缓冲区
+		{			
+			// 清屏
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
 
-			// 激活屏幕着色器，先激活着色器
+			// 先激活着色器
 			ScreenShader.use();
 
-			// 再绑定纹理，绑定textureColorbuffer到纹理单元0
-			screenBuffer.BindAsTexture();
-
+			// 将当前活跃FBO绑定为纹理
+			screenBuffer.setCurrentAsTexture(cam.LoopNum);
+			
 			// 最后设置uniform，screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的screenTexture为纹理0
 			ScreenShader.setInt("screenTexture", 0);
 
-			// 目前没有实际使用，目的是为了记录渲染的轮数，我们在相机类Camera 中定义了 LoopNum，当相机位置和角度变化时，该值归0。每帧在渲染前，该值都会加1
-			ScreenShader.setInt("camera.LoopNum", cam.LoopNum);
-
-			// 再绘制一次屏幕，将当前帧与历史帧的结果合并，并显示到屏幕上。
-			screen.DrawTextureQuad(); // 明确表示这是绘制纹理四边形
+			// 绘制屏幕
+			screen.DrawTextureQuad();
 		}
 
 		// 交换Buffer
@@ -163,13 +167,13 @@ void processInput(GLFWwindow *window) {
 		glfwSetWindowShouldClose(window, true);
 
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		cam.ProcessKeyboard(FORWARD, timeRecorder.deltaTime);
+		cam.ProcessKeyboard(FORWARD, tRecord.deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		cam.ProcessKeyboard(BACKWARD, timeRecorder.deltaTime);
+		cam.ProcessKeyboard(BACKWARD, tRecord.deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		cam.ProcessKeyboard(LEFT, timeRecorder.deltaTime);
+		cam.ProcessKeyboard(LEFT, tRecord.deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		cam.ProcessKeyboard(RIGHT, timeRecorder.deltaTime);
+		cam.ProcessKeyboard(RIGHT, tRecord.deltaTime);
 }
 
 // 处理窗口尺寸变化
@@ -191,5 +195,3 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	cam.updateFov(static_cast<float>(yoffset));
 }
-
-
