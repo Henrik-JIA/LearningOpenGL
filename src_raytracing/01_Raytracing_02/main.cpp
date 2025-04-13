@@ -93,7 +93,7 @@ int main()
 		// 输入
 		processInput(window);
 
-		// 渲染循环加1
+		// 渲染循环加1，LoopNum初始为0，循环开始就加1。
 		cam.LoopIncrease();
 
 		// 光线追踪渲染当前帧
@@ -136,11 +136,20 @@ int main()
 			// 先激活着色器
 			ScreenShader.use();
 
-			// 将当前活跃FBO绑定为纹理
+			// 将之前FBO渲染的纹理传入
 			screenBuffer.setCurrentAsTexture(cam.LoopNum);
-			
 			// 最后设置uniform，screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的screenTexture为纹理0
 			ScreenShader.setInt("screenTexture", 0);
+
+			// 设置模型、视图、投影矩阵
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); 
+			model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // y轴旋转45度
+			glm::mat4 view = cam.GetViewMatrix();
+			glm::mat4 projection = glm::perspective(glm::radians(cam.fov), (float)SCR_WIDTH/(float)SCR_HEIGHT, 0.1f, 100.0f);
+			ScreenShader.setMat4("model", model);
+			ScreenShader.setMat4("view", view);
+			ScreenShader.setMat4("projection", projection);
 
 			// 绘制屏幕
 			screen.DrawTextureQuad();
