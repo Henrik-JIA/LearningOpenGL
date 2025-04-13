@@ -13,10 +13,9 @@
 #include <tool/Model.h>
 #include <tool/Camera.h>
 #include <tool/TimeRecorder.h>
-#include <tool/RandomUtils.h>
-#include <tool/RenderBuffer.h>
-#include <geometry/RT_Screen_2D.h>
-
+#include <tool/RandomUtils.h> // 这个就对应Tool.h文件
+#include <tool/RenderBuffer.h> // 这个就对应RT_Screen.h文件
+#include <geometry/RT_Screen_2D.h> // 这个就对应RT_Screen.h文件
 
 #include <iostream>
 
@@ -62,7 +61,7 @@ int main()
 	glfwSetScrollCallback(window, scroll_callback);
 
 	// 窗口捕获鼠标，不显示鼠标
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	// 加载所有的OpenGL函数指针
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -74,8 +73,8 @@ int main()
 	CPURandomInit();
 
 	// 加载着色器
-	Shader RayTracerShader = Shader::FromFile("../src_raytracing/01_Raytracing_02/shader/RayTracerVertexShader.glsl", "../src_raytracing/01_Raytracing_02/shader/RayTracerFragmentShader.glsl");
-	Shader ScreenShader = Shader::FromFile("../src_raytracing/01_Raytracing_02/shader/ScreenVertexShader.glsl", "../src_raytracing/01_Raytracing_02/shader/ScreenFragmentShader.glsl");
+	Shader RayTracerShader = Shader::FromFile("../src_raytracing/01_Raytracing_03/shader/RayTracerVertexShader.glsl", "../src_raytracing/01_Raytracing_03/shader/RayTracerFragmentShader.glsl");
+	Shader ScreenShader = Shader::FromFile("../src_raytracing/01_Raytracing_03/shader/ScreenVertexShader.glsl", "../src_raytracing/01_Raytracing_03/shader/ScreenFragmentShader.glsl");
 
 	// 绑定屏幕的坐标位置
 	RT_Screen screen;
@@ -105,54 +104,58 @@ int main()
 			RayTracerShader.use();
 			// screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的historyTexture为纹理0
 			RayTracerShader.setInt("historyTexture", 0);
-
+			// 相机参数赋值
 			RayTracerShader.setVec3("camera.camPos", cam.Position);
 			RayTracerShader.setVec3("camera.front", cam.Front);
 			RayTracerShader.setVec3("camera.right", cam.Right);
 			RayTracerShader.setVec3("camera.up", cam.Up);
-			
+
 			RayTracerShader.setFloat("camera.halfH", cam.halfH);
 			RayTracerShader.setFloat("camera.halfW", cam.halfW);
-			
+
 			RayTracerShader.setVec3("camera.leftbottom", cam.LeftBottomCorner);
 			
 			RayTracerShader.setInt("camera.LoopNum", cam.LoopNum);
 			
+			// 随机数初值赋值
 			RayTracerShader.setFloat("randOrigin", 674764.0f * (GetCPURandom() + 1.0f));
 			
-			// 绘制到FBO的textureColorbuffer
-			screen.RenderToFramebuffer(); // 明确表示这是渲染到FBO，绘制到帧缓冲纹理
+			// 球体数量赋值，绘制10个球体，前9个球体使用循环生成，最后一个球体是地板
+			// -----------------------------------------------------
+			RayTracerShader.setInt("sphereNum", 10);
+			// 使用循环生成前9个球体
+			int x_values[] = {0, 1, -1};
+			for (int i = 0; i < 9; ++i) {
+				int y = i / 3;
+				float x = x_values[i % 3];
+				RayTracerShader.setFloat(("sphere[" + std::to_string(i) + "].radius").c_str(), 0.5f);
+				RayTracerShader.setVec3(("sphere[" + std::to_string(i) + "].center").c_str(), 
+					glm::vec3(x, y, -1.0f));
+			}
+			// 地板物体赋值
+			RayTracerShader.setFloat("sphere[9].radius", 100.0);
+			RayTracerShader.setVec3("sphere[9].center", glm::vec3(0.0, -100.5, -1.0));
+			// -----------------------------------------------------
 
-			// 解绑帧缓冲，解绑到默认帧缓冲
-			screenBuffer.unBind();
+			// 渲染FrameBuffer
+			screen.DrawScreen();
 		}
 
 		// 渲染到默认Buffer上
-		{			
+		{
+			// 绑定到默认缓冲区
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			// 清屏
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
 
-			// 先激活着色器
 			ScreenShader.use();
-
-			// 将之前FBO渲染的纹理传入
 			screenBuffer.setCurrentAsTexture(cam.LoopNum);
-			// 最后设置uniform，screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的screenTexture为纹理0
+			// screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的screenTexture为纹理0
 			ScreenShader.setInt("screenTexture", 0);
 
-			// 设置模型、视图、投影矩阵
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); 
-			model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // y轴旋转45度
-			glm::mat4 view = cam.GetViewMatrix();
-			glm::mat4 projection = glm::perspective(glm::radians(cam.fov), (float)SCR_WIDTH/(float)SCR_HEIGHT, 0.1f, 100.0f);
-			ScreenShader.setMat4("model", model);
-			ScreenShader.setMat4("view", view);
-			ScreenShader.setMat4("projection", projection);
-
 			// 绘制屏幕
-			screen.DrawTextureQuad();
+			screen.DrawScreen();
 		}
 
 		// 交换Buffer
@@ -204,3 +207,5 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	cam.updateFov(static_cast<float>(yoffset));
 }
+
+
