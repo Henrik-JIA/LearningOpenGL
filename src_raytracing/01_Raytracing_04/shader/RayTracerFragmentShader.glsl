@@ -1,11 +1,14 @@
 #version 330 core
 out vec4 FragColor;
 
+// 纹理坐标
 in vec2 TexCoords;
 
+// 屏幕宽高
 uniform int screenWidth;
 uniform int screenHeight;
 
+// 相机结构体
 struct Camera {
 	vec3 camPos;
 	vec3 front;
@@ -18,6 +21,7 @@ struct Camera {
 };
 uniform Camera camera;
 
+// 光线结构体
 struct Ray {
 	vec3 origin;
 	vec3 direction;
@@ -51,6 +55,7 @@ vec3 shading(Ray r);
 // 采样历史帧的纹理采样器
 uniform sampler2D historyTexture;
 
+// 主函数
 void main() {
 	wseed = uint(randOrigin * float(6.95857) * (TexCoords.x * TexCoords.y));
 	//if (distance(TexCoords, vec2(0.5, 0.5)) < 0.4)
@@ -61,12 +66,22 @@ void main() {
 	// 获取历史帧信息
 	vec3 hist = texture(historyTexture, TexCoords).rgb;
 
+	// 生成光线
 	Ray cameraRay;
 	cameraRay.origin = camera.camPos;
 	cameraRay.direction = normalize(camera.leftbottom + (TexCoords.x * 2.0 * camera.halfW) * camera.right + (TexCoords.y * 2.0 * camera.halfH) * camera.up);
 
-	vec3 curColor = shading(cameraRay);
-	curColor = (1.0 / float(camera.LoopNum))*curColor + (float(camera.LoopNum - 1) / float(camera.LoopNum))*hist;
+	// 计算当前颜色
+	// 初始值：vec3(1.0)（纯白）
+	// 每次碰撞：颜色值乘以0.8（衰减20%）
+	// 最终颜色：1.0 × 0.8^N（N为实际反弹次数）
+	vec3 curColor = shading(cameraRay); // 这里返回累计衰减后的颜色
+	
+	// 混合历史帧和当前颜色，实现均值计算
+	curColor = (1.0 / float(camera.LoopNum))*curColor 
+				+ (float(camera.LoopNum - 1) / float(camera.LoopNum))*hist;
+	
+	// 输出颜色
 	FragColor = vec4(curColor, 1.0);
 
 }
@@ -103,7 +118,7 @@ float hitSphere(Sphere s, Ray r) {
 	else return -1.0;
 }
 
-// 返回值：ray到球交点的距离
+// 返回值：是否击中物体
 bool hitWorld(Ray r) {
 	float dis = 100000;
 	bool hitAnything = false;
@@ -124,6 +139,7 @@ bool hitWorld(Ray r) {
 	else return false;
 }
 
+// 随机生成单位球内的点
 vec3 random_in_unit_sphere() {
 	vec3 p;
 	do {
@@ -132,22 +148,46 @@ vec3 random_in_unit_sphere() {
 	return p;
 }
 
+// 计算当前颜色
 vec3 shading(Ray r) {
-	vec3 color = vec3(1.0,1.0,1.0);
-	bool hitAnything = false;
-	for (int i = 0; i < 20; i++) {
-		if (hitWorld(r)) {
-			r.origin = rec.Pos;
-			r.direction = normalize(rec.Normal + random_in_unit_sphere());
-			color *= 0.8;
-			hitAnything = true;
-		}
-		else {
-			break;
-		}
-	}
-	if(!hitAnything) color = vec3(0.0, 0.0, 0.0);
-	return color;
+    vec3 color = vec3(1.0); // 初始颜色为白色
+	bool hitAnything = false; // 是否击中物体
+    
+    // 光线最多反弹20次
+    for (int i = 0; i < 20; i++) {
+        if (hitWorld(r)) { // 光线击中物体
+			vec3 N = rec.Normal; // 法向量
+			vec3 LightDir = normalize(vec3(1.0, 1.0, 4.0)); // 光源方向
+			
+			// 只在第一次碰撞时计算直接光照
+			if(i == 0)
+			{
+				// 漫反射：兰伯特余弦定律
+				float dif = max(dot(N, LightDir), 0.0);
+				// 镜面反射：布林-冯模型（简化版）
+				float spec = pow(max(dot(N, LightDir), 0.0), 64); // 镜面反射系数
+				color = color * (0.1 + 0.5 * dif + 0.4 * spec); // 累加直接光照
+			}
+
+			// 准备下一次光线追踪
+            r.origin = rec.Pos; // 新光线起点设为交点位置
+            // 新光线方向：法线方向 + 随机单位球向量（实现漫反射）
+            r.direction = normalize(rec.Normal + random_in_unit_sphere());
+
+			// 每次碰撞都进行衰减，累积衰减
+			color *= 0.8; // 每次反射衰减20%能量
+
+			// 光线击中物体
+            hitAnything = true;
+        }
+        else {
+            break; // 光线逃逸到天空则终止
+        }
+    }
+    
+    // 如果从未击中任何物体，返回黑色
+    if(!hitAnything) color = vec3(0.0);
+    return color;
 }
 
 
