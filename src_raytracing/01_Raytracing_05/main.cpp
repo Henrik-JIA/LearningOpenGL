@@ -123,24 +123,24 @@ int main()
 			
 			// 球物体赋值
 			RayTracerShader.setFloat("sphere[0].radius", 0.5);
-			RayTracerShader.setVec3("sphere[0].center", glm::vec3(0.0, 0.0, -1.0));
-			RayTracerShader.setInt("sphere[0].materialIndex", 0);
-			RayTracerShader.setVec3("sphere[0].albedo", glm::vec3(0.8, 0.7, 0.2));
+			RayTracerShader.setVec3("sphere[0].center", glm::vec3(-1.2, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[0].materialIndex", 1); // 金属
+			RayTracerShader.setVec3("sphere[0].albedo", glm::vec3(0.8, 0.7, 0.2)); // 颜色：黄色
 
 			RayTracerShader.setFloat("sphere[1].radius", 0.5);
-			RayTracerShader.setVec3("sphere[1].center", glm::vec3(1.0, 0.0, -1.0));
-			RayTracerShader.setInt("sphere[1].materialIndex", 1);
-			RayTracerShader.setVec3("sphere[1].albedo", glm::vec3(0.2, 0.7, 0.6));
+			RayTracerShader.setVec3("sphere[1].center", glm::vec3(0.0, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[1].materialIndex", 0); // 漫反射
+			RayTracerShader.setVec3("sphere[1].albedo", glm::vec3(0.2, 0.7, 0.6)); // 颜色：绿色
 
 			RayTracerShader.setFloat("sphere[2].radius", 0.5);
-			RayTracerShader.setVec3("sphere[2].center", glm::vec3(-1.0, 0.0, -1.0));
-			RayTracerShader.setInt("sphere[2].materialIndex", 1);
-			RayTracerShader.setVec3("sphere[2].albedo", glm::vec3(0.1, 0.3, 0.7));
+			RayTracerShader.setVec3("sphere[2].center", glm::vec3(1.2, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[2].materialIndex", 1); // 金属
+			RayTracerShader.setVec3("sphere[2].albedo", glm::vec3(0.1, 0.3, 0.7)); // 颜色：蓝色
 
 			RayTracerShader.setFloat("sphere[3].radius", 100.0);
 			RayTracerShader.setVec3("sphere[3].center", glm::vec3(0.0, -100.5, -1.0));
 			RayTracerShader.setInt("sphere[3].materialIndex", 0);
-			RayTracerShader.setVec3("sphere[3].albedo", glm::vec3(0.9, 0.9, 0.9));
+			RayTracerShader.setVec3("sphere[3].albedo", glm::vec3(0.9, 0.9, 0.9)); // 颜色：白色
 
 			// 渲染FrameBuffer
 			screen.DrawScreen();

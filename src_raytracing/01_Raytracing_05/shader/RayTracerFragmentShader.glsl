@@ -42,10 +42,11 @@ uniform Sphere sphere[4];
 // 击中记录结构体
 // 这里会将球体的反射率和材质类型传给hitRecord结构体
 struct hitRecord {
-	vec3 Normal;
-	vec3 Pos;
-	vec3 albedo;
-	int materialIndex;
+    vec3 Normal;        // 表面法线（始终指向外部）
+    vec3 Pos;           // 碰撞点位置
+    vec3 albedo;        // 材质颜色
+    int materialIndex;  // 材质类型索引
+    bool isEntering;    // 新增：标记光线是否进入物体
 };
 hitRecord rec;
 
@@ -148,8 +149,14 @@ bool hitWorld(Ray r) {
 
 		// 计算法线：交点到球心的向量归一化
 		// 球心指向交点的向量并归一化，就是该点的法向量。
-		rec.Normal = normalize(rec.Pos - sphere[hitSphereIndex].center);
+		vec3 outwardNormal = normalize(rec.Pos - sphere[hitSphereIndex].center);
 		
+		// 判断光线是否进入物体
+		rec.isEntering = dot(r.direction, outwardNormal) < 0.0;
+
+		// 始终使用指向外部的法线
+		rec.Normal = rec.isEntering ? outwardNormal : -outwardNormal;
+
 		// 记录材质属性
 		rec.albedo = sphere[hitSphereIndex].albedo; // 反照率（基础颜色）
 		rec.materialIndex = sphere[hitSphereIndex].materialIndex; // 材质类型索引
@@ -202,6 +209,7 @@ vec3 metalReflection(vec3 rayIn, vec3 Normal) {
 	return normalize(r + 0.35* random_in_unit_sphere()); // 添加随机扰动
 }
 
+
 // 返回值：着色
 vec3 shading(Ray r) {
 	// 初始颜色为白色
@@ -223,7 +231,7 @@ vec3 shading(Ray r) {
 				r.direction = diffuseReflection(rec.Normal);
 			else if(rec.materialIndex == 1)
 				r.direction = metalReflection(r.direction, rec.Normal); // 参数1为光线方向，参数2为交点法向量
-			
+
 			// 累加颜色
 			color *= rec.albedo;
 			// 是否击中物体
