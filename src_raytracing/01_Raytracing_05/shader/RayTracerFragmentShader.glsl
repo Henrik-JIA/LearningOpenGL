@@ -161,6 +161,7 @@ bool hitWorld(Ray r) {
 
 // 返回值：随机单位球内的点
 // 生成单位球体内的随机点（用于漫反射方向采样）
+// 也就是，生成单位球内随机向量
 // 为漫反射和金属反射提供随机方向采样
 vec3 random_in_unit_sphere() {
     vec3 p;
@@ -178,14 +179,27 @@ vec3 random_in_unit_sphere() {
 // 返回值：漫反射
 // 漫反射方向生成（Lambertian反射）
 vec3 diffuseReflection(vec3 Normal) {
-	// 法线方向+随机扰动
+	// 法线方向 + 随机扰动 = 漫反射方向
 	return normalize(Normal + random_in_unit_sphere());
 }
 
 // 返回值：金属反射
 // 金属反射（带粗糙度的镜面反射）
+// 物理模型：微表面镜面反射（带粗糙度）
+// ----------------------------------------------
+// 理想镜面反射（用于计算反射后的光线方向）：rayIn - 2 * dot(rayIn, Normal) * Normal
+// 物理过程分解：
+// 原始入射：v = v_parallel法线分量 + v_perp切平面分量
+// 仅反转法线分量，保持切平面分量：
+// 反射过程：r = -v_parallel + v_perp 
+//            = (v_parallel + v_perp) - 2v_parallel 
+//            = v - 2v_parallel
+// ----------------------------------------------
+// 表面粗糙度：0.35 * random_in_unit_sphere() 添加随机扰动，0.35控制粗糙度（0.0为完美镜面）
+// 表面越粗糙（α越大），反射越模糊
 vec3 metalReflection(vec3 rayIn, vec3 Normal) {
-	return normalize(rayIn - 2 * dot(rayIn, Normal) * Normal + 0.35* random_in_unit_sphere());
+	vec3 r = rayIn - 2 * dot(rayIn, Normal) * Normal; // 完全反射
+	return normalize(r + 0.35* random_in_unit_sphere()); // 添加随机扰动
 }
 
 // 返回值：着色
@@ -204,10 +218,11 @@ vec3 shading(Ray r) {
 			r.origin = rec.Pos;
 
 			// 根据材质类型选择反射方向
+			// 这里rec.Normal初始法线是球心指向交点的向量并归一化，就是光线交点的法向量。
 			if(rec.materialIndex == 0)
 				r.direction = diffuseReflection(rec.Normal);
 			else if(rec.materialIndex == 1)
-				r.direction = metalReflection(r.direction, rec.Normal);
+				r.direction = metalReflection(r.direction, rec.Normal); // 参数1为光线方向，参数2为交点法向量
 			
 			// 累加颜色
 			color *= rec.albedo;
