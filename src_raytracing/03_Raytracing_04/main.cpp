@@ -132,12 +132,11 @@ int main()
 	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
 	
 	// 加载数据纹理
-	//Model bunny("./Data/bunny.obj");
-	// Model dragon("./Data/dragon.obj");
-	Model dragon("../static/model/dragon/dragon.obj");
-	getTexture(dragon.meshes, RayTracerShader, ObjTex, bvhTree, 0.04, glm::vec3(0.0,-0.2,0.0));
-
-	//Model box("./Data/box.obj");
+	// Model dragon("../static/model/dragon/dragon.obj");
+	Model bunny("../static/model/bunny/bunny.obj");
+	// getTexture(dragon.meshes, RayTracerShader, ObjTex, bvhTree, 0.04, glm::vec3(0.0,-0.2,0.0));
+	getTexture(bunny.meshes, RayTracerShader, ObjTex, bvhTree, 4.0, glm::vec3(0.0,-0.3,0.0));
+	//Model box("../static/model/box/box.obj");
 	//getTexture(box.meshes, RayTracerShader, ObjTex, bvhTree, 0.2, glm::vec3(0.0, 0.0, 0.0));
 
 	//测试BVH树
@@ -301,7 +300,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     }
     // 右键：视角平移
     else if (cam.isPanning) {      
-        cam.PanSensitivity = 0.005f;
+        cam.PanSensitivity = 0.003f;
         cam.ProcessPanByPosition(xpos, ypos);
         cameraPos = cam.Position;
     }

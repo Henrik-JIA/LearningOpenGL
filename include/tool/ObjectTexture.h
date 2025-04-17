@@ -40,7 +40,13 @@ public:
 };
 
 
-void getTexture(std::vector<Mesh> & data, Shader& shader, ObjectTexture& objTex, BVHTree& bvhTree, float Scale = 1.0f, glm::vec3 bias = glm::vec3(0.0f)) {
+void getTexture(std::vector<Mesh> & data, 
+				Shader& shader, 
+				ObjectTexture& objTex, 
+				BVHTree& bvhTree, 
+				float Scale = 1.0f, 
+				glm::vec3 bias = glm::vec3(0.0f)) 
+{
 	int dataSize_v = 0, dataSize_f = 0;
 	for (int i = 0; i < data.size(); i++) {
 		// 累加每个Mesh的size

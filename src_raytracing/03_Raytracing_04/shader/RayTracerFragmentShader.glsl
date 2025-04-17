@@ -36,7 +36,7 @@ struct LinearBVHNode {
 	vec3 pMin, pMax;
 	int nPrimitives;
 	int axis;
-	int childOffset; //�ڶ����ӽڵ�λ������ �� ��Ԫ��ʼλ������
+	int childOffset; //第二个子节点位置索引 或 基元起始位置索引
 };
 
 struct Sphere {
@@ -70,7 +70,7 @@ hitRecord rec;
 
 
 float At(sampler2D dataTex, float index);
-// ����ֵ��ray���򽻵�ľ���
+// 返回值：ray到球交点的距离
 float hitSphere(Sphere s, Ray r);
 float hitTriangle(Triangle tri, Ray r);
 bool hitWorld(Ray r);
@@ -79,7 +79,7 @@ vec3 getTriangleNormal(Triangle tri);
 
 bool IntersectBound(Bound3f bounds, Ray ray, vec3 invDir, bool dirIsNeg[3]);
 
-// ������ʷ֡������������
+// 采样历史帧的纹理采样器
 uniform sampler2D historyTexture;
 
 void main() {
@@ -89,7 +89,7 @@ void main() {
 	//else
 	//	FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 
-	// ��ȡ��ʷ֡��Ϣ
+	// 获取历史帧信息
 	vec3 hist = texture(historyTexture, TexCoords).rgb;
 
 	Ray cameraRay;
@@ -105,7 +105,7 @@ void main() {
 }
 
 
-// ************ ��������� ************** //
+// ************ 随机数功能 ************** //
 float randcore(uint seed) {
 	seed = (seed ^ uint(61)) ^ (seed >> uint(16));
 	seed *= uint(9);
@@ -119,7 +119,7 @@ float rand() {
 }
 
 
-// ********* ���г�������غ��� ********* // 
+// ********* 击中场景的相关函数 ********* // 
 
 LinearBVHNode getLinearBVHNode(int offset) {
 	int offset1 = offset * (9);
@@ -132,7 +132,7 @@ LinearBVHNode getLinearBVHNode(int offset) {
 	return node;
 }
 
-// ����ֵ��ray���򽻵�ľ���
+// 返回值：ray到球交点的距离
 float hitSphere(Sphere s, Ray r) {
 	vec3 oc = r.origin - s.center;
 	float a = dot(r.direction, r.direction);
@@ -146,18 +146,18 @@ float hitSphere(Sphere s, Ray r) {
 	}
 	else return -1.0;
 }
-// ����ֵ��ray�������ν���ľ���
+// 返回值：ray到三角形交点的距离
 float hitTriangle(Triangle tri, Ray r) {
-	// �ҵ�����������ƽ�淨����
+	// 找到三角形所在平面法向量
 	vec3 A = tri.v1 - tri.v0;
 	vec3 B = tri.v2 - tri.v0;
 	vec3 N = normalize(cross(A, B));
-	// Ray��ƽ��ƽ�У�û�н���
+	// Ray与平面平行，没有交点
 	if (dot(N, r.direction) == 0) return -1.0;
 	float D = -dot(N, tri.v0);
 	float t = -(dot(N, r.origin) + D) / dot(N, r.direction);
 	if (t < 0) return -1.0;
-	// ���㽻��
+	// 计算交点
 	vec3 pHit = r.origin + t * r.direction;
 	vec3 edge0 = tri.v1 - tri.v0;
 	vec3 C0 = pHit - tri.v0;
@@ -168,7 +168,7 @@ float hitTriangle(Triangle tri, Ray r) {
 	vec3 edge2 = tri.v0 - tri.v2;
 	vec3 C2 = pHit - tri.v2;
 	if (dot(N, cross(edge2, C2)) < 0) return -1.0;
-	// ������Ray�ཻ
+	// 光线与Ray相交
 	return t - 0.000001;
 }
 
@@ -187,11 +187,11 @@ bool IntersectBVH(Ray ray) {
 	Triangle tri;
 	while (true) {
 		LinearBVHNode node = getLinearBVHNode(currentNodeIndex);
-		// Ray �� BVH�Ľ���
+		// Ray 与 BVH的交点
 		Bound3f bound; bound.pMin = node.pMin; bound.pMax = node.pMax;
 		if (IntersectBound(bound, ray, invDir, dirIsNeg)) {
 			if (node.nPrimitives > 0) {
-				// Ray �� Ҷ�ڵ�Ľ���
+				// Ray 与 叶节点的交点
 				for (int i = 0; i < node.nPrimitives; ++i) {
 					int offset = (node.childOffset + i);
 					Triangle tri_t = getTriangle(offset);
@@ -206,7 +206,7 @@ bool IntersectBVH(Ray ray) {
 				currentNodeIndex = nodesToVisit[--toVisitOffset];
 			}
 			else {
-				// �� BVH node ���� _nodesToVisit_ stack, advance to near
+				// 把 BVH node 放入 _nodesToVisit_ stack, advance to near
 				if (bool(dirIsNeg[node.axis])) {
 					nodesToVisit[toVisitOffset++] = currentNodeIndex + 1;
 					currentNodeIndex = node.childOffset;
@@ -225,7 +225,7 @@ bool IntersectBVH(Ray ray) {
 
 	if (hit) {
 		rec.Pos = ray.origin + ray.hitMin * ray.direction;
-		// ��Ҳ�����ģ�͵Ķ���������˳ʱ�뻹����ʱ�룬�Ӹ���Ч���ǶԵġ�
+		// 我也不清楚模型的顶点坐标是顺时针还是逆时针，加负号效果是对的。
 		rec.Normal = -getTriangleNormal(tri);
 		rec.albedo = vec3(0.83, 0.73, 0.1);
 		rec.rayHitMin = ray.hitMin;
@@ -263,7 +263,7 @@ vec3 getTriangleNormal(Triangle tri) {
 	return normalize(cross(tri.v2 - tri.v0, tri.v1 - tri.v0));
 }
 
-// ����ֵ��ray���򽻵�ľ���
+// 返回值：ray到球交点的距离
 bool hitWorld(Ray r) {
 
 	bool ifHitSphere = false;
@@ -277,7 +277,7 @@ bool hitWorld(Ray r) {
 		ifHitTriangleMesh = true;
 	}
 
-	// ����ذ��ཻ
+	// 计算地板相交
 	for (int i = 0; i < 2; i++) {
 		float dis_t = hitTriangle(triFloor[i], r);
 		if (dis_t > 0 && dis_t < r.hitMin) {
@@ -287,7 +287,7 @@ bool hitWorld(Ray r) {
 		}
 	}
 
-	// ������
+	// 计算球
 	/*for (int i = 0; i < 4; i++) {
 		float dis_t = hitSphere(sphere[i], r);
 		if (dis_t > 0 && dis_t < dis) {
@@ -307,7 +307,8 @@ bool hitWorld(Ray r) {
 	if (ifHitTriangleFloor) {
 		rec.Pos = r.origin + r.hitMin * r.direction;
 		rec.Normal = getTriangleNormal(triFloor[hitTriangleIndex]);
-		rec.albedo = vec3(0.87, 0.87, 0.87);
+		// rec.albedo = vec3(0.87, 0.87, 0.87); 
+		rec.albedo = vec3(0.8, 0.8, 0.8);  // 改为淡青色玻璃色调
 		rec.materialIndex = 1;
 		return true;
 	}
@@ -330,12 +331,12 @@ vec3 diffuseReflection(vec3 Normal) {
 }
 
 vec3 metalReflection(vec3 rayIn, vec3 Normal) {
-	return normalize(rayIn - 2 * dot(rayIn, Normal) * Normal + 0.15 * random_in_unit_sphere());
+	return normalize(rayIn - 2 * dot(rayIn, Normal) * Normal + 0.01 * random_in_unit_sphere());
 }
 
 vec3 shading(Ray r) {
 	vec3 color = vec3(1.0,1.0,1.0);
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 20; i++) {
 		if (hitWorld(r)) {
 			
 			if(rec.materialIndex == 0)
@@ -351,7 +352,7 @@ vec3 shading(Ray r) {
 		else {
 
 			if (i == 1) {
-				vec3 lightPos = vec3(-4.0, 4.0, -4.0);
+				vec3 lightPos = vec3(-4.0, 4.0, 4.0);
 				vec3 lightDir = normalize(lightPos - rec.Pos);
 				float diff = 0.5 * max(dot(rec.Normal, lightDir), 0.0) + 0.5;
 				color *= vec3(diff, diff, diff);
