@@ -1,3 +1,4 @@
+#pragma once
 #ifndef MESH_H
 #define MESH_H
 
@@ -5,14 +6,16 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <tool/shader.h>
+#include <tool/Shader.h>
 
 #include <string>
 #include <vector>
 
 using namespace std;
 
-#ifndef BUFFER_GROMETRY
+// #ifndef BUFFER_GROMETRY
+
+#define MAX_BONE_INFLUENCE 4
 struct Vertex
 {
 	glm::vec3 Position;	 // 顶点属性
@@ -22,8 +25,13 @@ struct Vertex
 	// 切线空间属性
 	glm::vec3 Tangent;
 	glm::vec3 Bitangent;
+	
+	//bone indexes which will influence this vertex
+	int m_BoneIDs[MAX_BONE_INFLUENCE];
+	//weights from each bone
+	float m_Weights[MAX_BONE_INFLUENCE];
 };
-#endif
+
 
 struct Texture
 {
@@ -41,6 +49,7 @@ public:
 	vector<Texture> textures;
 	unsigned int VAO;
 
+	// constructor
 	Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
 	{
 		this->vertices = vertices;
@@ -61,7 +70,7 @@ public:
 		for (unsigned int i = 0; i < textures.size(); i++)
 		{
 			glActiveTexture(GL_TEXTURE0 + i); // active proper texture unit before binding
-																				// retrieve texture number (the N in diffuse_textureN)
+											  // retrieve texture number (the N in diffuse_textureN)
 			string number;
 			string name = textures[i].type;
 			if (name == "texture_diffuse")
@@ -126,7 +135,13 @@ private:
 		// vertex bitangent
 		glEnableVertexAttribArray(4);
 		glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Bitangent));
+		// ids
+		glEnableVertexAttribArray(5);
+		glVertexAttribIPointer(5, 4, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, m_BoneIDs));
 
+		// weights
+		glEnableVertexAttribArray(6);
+		glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, m_Weights));
 		glBindVertexArray(0);
 	}
 };

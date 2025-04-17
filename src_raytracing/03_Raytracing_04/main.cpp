@@ -11,11 +11,16 @@
 #include <tool/Shader.h>
 #include <tool/Mesh.h>
 #include <tool/Model.h>
-#include <tool/Camera.h>
-#include <tool/TimeRecorder.h>
 #include <tool/RandomUtils.h> // 这个就对应Tool.h文件
+#include <tool/Camera.h> // 这个就是对应Camera.h文件
+#include <tool/TimeRecorder.h> // 这个就是对应Camera.h文件
+#include <tool/BVHTree.h>
+#include <tool/ObjectTexture.h>
+
 #include <tool/RenderBuffer.h> // 这个就对应RT_Screen.h文件
 #include <geometry/RT_Screen_2D.h> // 这个就对应RT_Screen.h文件
+// #include <tool2/RT_Screen.h>
+
 
 #include <iostream>
 
@@ -33,6 +38,17 @@ Camera cam(SCR_WIDTH, SCR_HEIGHT);
 
 RenderBuffer screenBuffer;
 
+BVHTree bvhTree;
+
+ObjectTexture ObjTex;
+
+// RayTracerShader 纹理序号：
+// 纹理0：Framebuffer
+// 纹理1：MeshVertex
+// 纹理2：MeshFaceIndex
+
+// ScreenShader 纹理序号：
+// 纹理0：Framebuffer
 
 int main()
 {
@@ -74,8 +90,8 @@ int main()
 	CPURandomInit();
 
 	// 加载着色器
-	Shader RayTracerShader = Shader::FromFile("../src_raytracing/02_Raytracing_01/shader/RayTracerVertexShader.glsl", "../src_raytracing/02_Raytracing_01/shader/RayTracerFragmentShader.glsl");
-	Shader ScreenShader = Shader::FromFile("../src_raytracing/02_Raytracing_01/shader/ScreenVertexShader.glsl", "../src_raytracing/02_Raytracing_01/shader/ScreenFragmentShader.glsl");
+	Shader RayTracerShader = Shader::FromFile("../src_raytracing/03_Raytracing_04/shader/RayTracerVertexShader.glsl", "../src_raytracing/03_Raytracing_04/shader/RayTracerFragmentShader.glsl");
+	Shader ScreenShader = Shader::FromFile("../src_raytracing/03_Raytracing_04/shader/ScreenVertexShader.glsl", "../src_raytracing/03_Raytracing_04/shader/ScreenFragmentShader.glsl");
 
 	// 绑定屏幕的坐标位置
 	RT_Screen screen;
@@ -83,6 +99,19 @@ int main()
 
 	// 生成屏幕FrameBuffer
 	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
+	
+	// 加载数据纹理
+	//Model bunny("./Data/bunny.obj");
+	// Model dragon("./Data/dragon.obj");
+	Model dragon("../static/model/dragon/dragon.obj");
+	getTexture(dragon.meshes, RayTracerShader, ObjTex, bvhTree, 0.04, glm::vec3(0.0,-0.2,0.0));
+
+	//Model box("./Data/box.obj");
+	//getTexture(box.meshes, RayTracerShader, ObjTex, bvhTree, 0.2, glm::vec3(0.0, 0.0, 0.0));
+
+	//测试BVH树
+	BVHTest(bvhTree, cam);
+	bvhTree.releaseAll();
 
 	// 渲染大循环
 	while (!glfwWindowShouldClose(window))
@@ -101,56 +130,58 @@ int main()
 			// 绑定到当前帧缓冲区
 			screenBuffer.setCurrentBuffer(cam.LoopNum);
 
-			// 激活着色器
-			RayTracerShader.use();
 			// screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的historyTexture为纹理0
 			RayTracerShader.setInt("historyTexture", 0);
+
+			// MeshTex赋值
+			ObjTex.setTex(RayTracerShader);
+
+			// 激活着色器
+			RayTracerShader.use();
+
 			// 相机参数赋值
 			RayTracerShader.setVec3("camera.camPos", cam.Position);
 			RayTracerShader.setVec3("camera.front", cam.Front);
 			RayTracerShader.setVec3("camera.right", cam.Right);
 			RayTracerShader.setVec3("camera.up", cam.Up);
-
 			RayTracerShader.setFloat("camera.halfH", cam.halfH);
 			RayTracerShader.setFloat("camera.halfW", cam.halfW);
-
 			RayTracerShader.setVec3("camera.leftbottom", cam.LeftBottomCorner);
-			
 			RayTracerShader.setInt("camera.LoopNum", cam.LoopNum);
-			
+
 			// 随机数初值赋值
 			RayTracerShader.setFloat("randOrigin", 874264.0f * (GetCPURandom() + 1.0f));
-			
-			// 球物体赋值，四个球体
+
+			// 球物体赋值
 			RayTracerShader.setFloat("sphere[0].radius", 0.5);
 			RayTracerShader.setVec3("sphere[0].center", glm::vec3(0.0, 0.0, -1.0));
-			RayTracerShader.setInt("sphere[0].materialIndex", 0); // 漫反射
+			RayTracerShader.setInt("sphere[0].materialIndex", 0);
 			RayTracerShader.setVec3("sphere[0].albedo", glm::vec3(0.8, 0.7, 0.2));
 
 			RayTracerShader.setFloat("sphere[1].radius", 0.5);
-			RayTracerShader.setVec3("sphere[1].center", glm::vec3(1.1, 0.0, -1.0));
-			RayTracerShader.setInt("sphere[1].materialIndex", 1); // 金属
+			RayTracerShader.setVec3("sphere[1].center", glm::vec3(1.0, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[1].materialIndex", 1);
 			RayTracerShader.setVec3("sphere[1].albedo", glm::vec3(0.2, 0.7, 0.6));
 
 			RayTracerShader.setFloat("sphere[2].radius", 0.5);
-			RayTracerShader.setVec3("sphere[2].center", glm::vec3(-1.1, 0.0, -1.0));
-			RayTracerShader.setInt("sphere[2].materialIndex", 1); // 金属
+			RayTracerShader.setVec3("sphere[2].center", glm::vec3(-1.0, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[2].materialIndex", 1);
 			RayTracerShader.setVec3("sphere[2].albedo", glm::vec3(0.1, 0.3, 0.7));
 
 			RayTracerShader.setFloat("sphere[3].radius", 0.5);
-			RayTracerShader.setVec3("sphere[3].center", glm::vec3(0.0, 1.1, -1.0));
-			RayTracerShader.setInt("sphere[3].materialIndex", 1); // 漫反射
-			RayTracerShader.setVec3("sphere[3].albedo", glm::vec3(0.9, 0.0, 0.0)); 
+			RayTracerShader.setVec3("sphere[3].center", glm::vec3(0.0, 0.0, 0.0));
+			RayTracerShader.setInt("sphere[3].materialIndex", 0);
+			RayTracerShader.setVec3("sphere[3].albedo", glm::vec3(0.9, 0.9, 0.9));
+			// 三角形赋值
+			float floorHfW = 1.0, upBias = -0.22;
+			RayTracerShader.setVec3("triFloor[0].v0", glm::vec3(-floorHfW, upBias, floorHfW));
+			RayTracerShader.setVec3("triFloor[0].v1", glm::vec3(-floorHfW, upBias, -floorHfW));
+			RayTracerShader.setVec3("triFloor[0].v2", glm::vec3(floorHfW, upBias, floorHfW));
 			
-			// 三角形赋值，平面
-			RayTracerShader.setVec3("tri[0].v0", glm::vec3(2.0, -0.5, 2.0));
-			RayTracerShader.setVec3("tri[0].v1", glm::vec3(-2.0, -0.5, -2.0));
-			RayTracerShader.setVec3("tri[0].v2", glm::vec3(-2.0, -0.5, 2.0));
-			
-			RayTracerShader.setVec3("tri[1].v0", glm::vec3(2.0, -0.5, 2.0));
-			RayTracerShader.setVec3("tri[1].v1", glm::vec3(-2.0, -0.5, -2.0));
-			RayTracerShader.setVec3("tri[1].v2", glm::vec3(2.0, -0.5, -2.0));
-			
+			RayTracerShader.setVec3("triFloor[1].v0", glm::vec3(floorHfW, upBias, floorHfW));
+			RayTracerShader.setVec3("triFloor[1].v1", glm::vec3(-floorHfW, upBias, -floorHfW));
+			RayTracerShader.setVec3("triFloor[1].v2", glm::vec3(floorHfW, upBias, -floorHfW));
+
 			// 渲染FrameBuffer
 			screen.DrawScreen();
 		}
@@ -221,6 +252,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	cam.updateFov(static_cast<float>(yoffset));
 }
+
 
 
 

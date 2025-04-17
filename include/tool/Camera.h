@@ -22,7 +22,7 @@ const float PITCH = 0.0f;
 const float KEYBOARD_MOVEMENT_SPEED = 2.5f;
 const float ROTATION_SENSITIVITY = 0.2f;
 const float PAN_SENSITIVITY = 0.02f;
-const float FOV = 45.0f; // ZOOM
+const float FOV = 22.5f; // ZOOM
 
 // An abstract camera class that processes input and calculates the corresponding Euler Angles, Vectors and Matrices for use in OpenGL
 class Camera
@@ -70,13 +70,13 @@ public:
 	// 默认值PITCH = 0.0f，平视
 	Camera( int ScreenWidth, 
 			int ScreenHeight,
-			glm::vec3 position = glm::vec3(0.0f, 0.0f, 5.0f), 
+			glm::vec3 position = glm::vec3(0.0f, 0.0f, 2.0f), 
 			glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), 
 			float yaw = YAW, 
 			float pitch = PITCH
 		) : ScreenWidth(ScreenWidth),
 			ScreenHeight(ScreenHeight),
-			ScreenRatio(ScreenWidth / ScreenHeight),
+			ScreenRatio((float)ScreenWidth / ScreenHeight),
 			halfH(glm::tan(glm::radians(fov))),
 			halfW(halfH * ScreenRatio),
 			Front(glm::vec3(0.0f, 0.0f, -1.0f)), 
@@ -106,7 +106,7 @@ public:
 			float yaw, float pitch // 欧拉角（无默认值）
 		) : ScreenWidth(ScreenWidth),
 			ScreenHeight(ScreenHeight),
-			ScreenRatio(ScreenWidth / ScreenHeight),
+			ScreenRatio((float)ScreenWidth / ScreenHeight),
 			halfH(glm::tan(glm::radians(fov))),
 			halfW(halfH * ScreenRatio),
 			Front(glm::vec3(0.0f, 0.0f, -1.0f)), 
@@ -283,6 +283,9 @@ private:
 		Right = glm::normalize(glm::cross(Front, WorldUp)); // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
 		Up = glm::normalize(glm::cross(Right, Front));
 	
+		// 添加视口参数更新
+		halfH = glm::tan(glm::radians(fov));
+		halfW = halfH * ScreenRatio;
 		LeftBottomCorner = Front - halfW * Right - halfH * Up;
 		LoopNum = 0;
 	}

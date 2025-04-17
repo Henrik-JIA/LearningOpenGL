@@ -1,5 +1,11 @@
+#pragma once
 #ifndef MODEL_H
 #define MODEL_H
+
+#include <glad/glad.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 // #include <assimp/Importer.hpp>
 // #include <assimp/scene.h>
@@ -20,10 +26,13 @@
 // #include <tool/stb_image.h>
 
 using namespace std;
+
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false, bool flip = true);
+
 class Model
 {
 public:
+	// model data 
 	vector<Texture> textures_loaded; // stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
 	vector<Mesh> meshes;
 	string directory;
