@@ -22,6 +22,7 @@ const float PITCH = 0.0f;
 const float KEYBOARD_MOVEMENT_SPEED = 2.5f;
 const float ROTATION_SENSITIVITY = 0.2f;
 const float PAN_SENSITIVITY = 0.02f;
+const float SCROLL_SENSITIVITY = 1.5f;
 const float FOV = 22.5f; // ZOOM
 
 // An abstract camera class that processes input and calculates the corresponding Euler Angles, Vectors and Matrices for use in OpenGL
@@ -44,6 +45,7 @@ public:
 	float KeyBoardMovementSpeed;
 	float RotationSensitivity;
 	float PanSensitivity;
+	float ScrollSensitivity;
 	float fov;
 
 	// 鼠标上一帧的位置
@@ -83,6 +85,7 @@ public:
 			KeyBoardMovementSpeed(KEYBOARD_MOVEMENT_SPEED), 
 			RotationSensitivity(ROTATION_SENSITIVITY),
 			PanSensitivity(PAN_SENSITIVITY),
+			ScrollSensitivity(SCROLL_SENSITIVITY),
 			fov(FOV),
 			LoopNum(0),
 			isRotating(false),
@@ -113,6 +116,7 @@ public:
 			KeyBoardMovementSpeed(KEYBOARD_MOVEMENT_SPEED), 
 			RotationSensitivity(ROTATION_SENSITIVITY),
 			PanSensitivity(PAN_SENSITIVITY),
+			ScrollSensitivity(SCROLL_SENSITIVITY),
 			fov(FOV),
 			LoopNum(0),
 			isRotating(false),
@@ -217,7 +221,7 @@ public:
 	}
 
 	// processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
-	void ProcessMouseScroll(float yoffset)
+	void ProcessScrollFromFOV(float yoffset)
 	{
 		fov -= (float)yoffset;
 		if (fov < 1.0f)
@@ -232,6 +236,17 @@ public:
 
 		LoopNum = 0;
 	}
+
+	// 新增滚动处理函数
+    void ProcessScrollFromMovement(bool forward, float deltaTime) {
+        float velocity = ScrollSensitivity * deltaTime;
+        if(forward) {
+            Position += Front * velocity;
+        } else {
+            Position -= Front * velocity;
+        }
+        updateCameraVectors(); // 确保更新视口参数
+    }
 
 	// 更新屏幕宽高比
 	void updateScreenRatio(int ScreenWidth, int ScreenHeight) {

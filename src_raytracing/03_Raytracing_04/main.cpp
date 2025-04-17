@@ -17,6 +17,8 @@
 #include <tool/BVHTree.h>
 #include <tool/ObjectTexture.h>
 
+#include <tool/gui.h>
+
 #include <tool/RenderBuffer.h> // 这个就对应RT_Screen.h文件
 #include <geometry/RT_Screen_2D.h> // 这个就对应RT_Screen.h文件
 // #include <tool2/RT_Screen.h>
@@ -26,11 +28,21 @@
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+// void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+// void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos); // 鼠标回调函数
+void mouse_button_calback(GLFWwindow *window, int button, int action, int mods); // 鼠标按钮回调函数
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset); // 滚轮回调函数
 
 unsigned int SCR_WIDTH = 1200;
 unsigned int SCR_HEIGHT = 800;
+
+// camera value
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 2.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
 
 timeRecord tRecord;
 
@@ -73,12 +85,31 @@ int main()
 
 	// 交互事件
 	glfwMakeContextCurrent(window);
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glfwSetCursorPosCallback(window, mouse_callback);
-	glfwSetScrollCallback(window, scroll_callback);
+	// glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	// glfwSetCursorPosCallback(window, mouse_callback);
+	// glfwSetScrollCallback(window, scroll_callback);
+	// 鼠标键盘事件
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback); // 注册窗口变化监听
+	glfwSetCursorPosCallback(window, mouse_callback); // 鼠标回调函数
+	glfwSetMouseButtonCallback(window, mouse_button_calback); // 鼠标按钮回调函数
+	glfwSetScrollCallback(window, scroll_callback); // 滚轮回调函数
 
 	// 窗口捕获鼠标，不显示鼠标
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	// glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	// -----------------------
+	// 创建imgui上下文
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO &io = ImGui::GetIO();
+	(void)io;
+	ImGui::StyleColorsDark(); // 设置样式
+	ImGui_ImplGlfw_InitForOpenGL(window, true); // 设置渲染平台
+	ImGui_ImplOpenGL3_Init("#version 330"); // 设置渲染器后端
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	// -----------------------
+
 
 	// 加载所有的OpenGL函数指针
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -238,22 +269,93 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	SCR_WIDTH = width;
 	SCR_HEIGHT = height;
 	cam.updateScreenRatio(SCR_WIDTH, SCR_HEIGHT);
+	
 	glViewport(0, 0, width, height);
+
 }
 
-// 鼠标事件响应
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
-	float xpos = static_cast<float>(xposIn);
-	float ypos = static_cast<float>(yposIn);
-	cam.ProcessRotationByPosition(xpos, ypos);
+// // 鼠标事件响应
+// void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
+// 	float xpos = static_cast<float>(xposIn);
+// 	float ypos = static_cast<float>(yposIn);
+// 	cam.ProcessRotationByPosition(xpos, ypos);
+// }
+
+// // 设置fov
+// void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+// 	cam.updateFov(static_cast<float>(yoffset));
+// }
+
+// 鼠标移动回调
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
+
+    // 左键：视角旋转
+    if (cam.isRotating) {
+        cam.RotationSensitivity = 0.1f;
+        cam.ProcessRotationByPosition(xpos, ypos);  // 直接传入当前坐标
+        cameraPos = cam.Position;
+        cameraFront = cam.Front;
+    }
+    // 右键：视角平移
+    else if (cam.isPanning) {      
+        cam.PanSensitivity = 0.005f;
+        cam.ProcessPanByPosition(xpos, ypos);
+        cameraPos = cam.Position;
+    }
+    // 更新初始位置
+    else {
+        cam.lastX = xpos;
+        cam.lastY = ypos;
+    }
 }
 
-// 设置fov
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-	cam.updateFov(static_cast<float>(yoffset));
+// 鼠标按键回调
+void mouse_button_calback(GLFWwindow *window, int button, int action, int mods)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
+
+  // 左键处理
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+      if (action == GLFW_PRESS) {
+          cam.isRotating = true;
+          glfwGetCursorPos(window, &cam.lastX, &cam.lastY);
+      } else if (action == GLFW_RELEASE) {
+          cam.isRotating = false;
+      }
+  }
+  // 右键处理
+  else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+      if (action == GLFW_PRESS) {
+          cam.isPanning = true;
+          glfwGetCursorPos(window, &cam.lastX, &cam.lastY);
+      } else if (action == GLFW_RELEASE) {
+          cam.isPanning = false;
+      }
+  }
 }
 
+// 滚轮回调
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
 
+    const float baseSpeed = 0.005f;
+    const float shiftMultiplier = 1.5f; // 按住Shift加速
+    
+    float actualSpeed = baseSpeed;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        actualSpeed *= shiftMultiplier;
+		cam.ScrollSensitivity = actualSpeed;
+    }
+
+    cam.ProcessScrollFromMovement(yoffset > 0, tRecord.deltaTime);
+	
+}
 
 
 
