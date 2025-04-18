@@ -54,6 +54,8 @@ BVHTree bvhTree;
 
 ObjectTexture ObjTex;
 
+std::vector<std::shared_ptr<Triangle>> primitives;
+
 // RayTracerShader 纹理序号：
 // 纹理0：Framebuffer
 // 纹理1：MeshVertex
@@ -132,12 +134,19 @@ int main()
 	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
 	
 	// 加载数据纹理
-	// Model dragon("../static/model/dragon/dragon.obj");
+	Model dragon("../static/model/dragon/dragon.obj");
 	Model bunny("../static/model/bunny/bunny.obj");
-	// getTexture(dragon.meshes, RayTracerShader, ObjTex, bvhTree, 0.04, glm::vec3(0.0,-0.2,0.0));
-	getTexture(bunny.meshes, RayTracerShader, ObjTex, bvhTree, 4.0, glm::vec3(0.0,-0.3,0.0));
+	getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-1.5,-0.2,0.0));
+	getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 4.0, glm::vec3(0.0,-0.3,0.0));
 	//Model box("../static/model/box/box.obj");
 	//getTexture(box.meshes, RayTracerShader, ObjTex, bvhTree, 0.2, glm::vec3(0.0, 0.0, 0.0));
+
+
+	// 构建BVH树
+	bvhTree.BVHBuildTree(primitives);
+
+    generateTextures(ObjTex, bvhTree, RayTracerShader);
+
 
 	//测试BVH树
 	BVHTest(bvhTree, cam);

@@ -40,9 +40,10 @@ public:
 };
 
 
-void getTexture(std::vector<Mesh> & data, 
+void getTexture(const std::vector<Mesh> & data, 
 				Shader& shader, 
 				ObjectTexture& objTex, 
+				std::vector<std::shared_ptr<Triangle>>& primitives, 
 				BVHTree& bvhTree, 
 				float Scale = 1.0f, 
 				glm::vec3 bias = glm::vec3(0.0f)) 
@@ -62,7 +63,6 @@ void getTexture(std::vector<Mesh> & data,
 	objTex.meshFaceNum = dataSize_f / 3;
 
 	// 生成每个三角形
-	std::vector<std::shared_ptr<Triangle>> primitives;
 	for (int i = 0; i < data.size(); i++) {
 		for (int j = 0; j < data[i].indices.size() / 3; j++) {
 			std::shared_ptr<Triangle> tri = std::make_shared<Triangle>();
@@ -74,10 +74,14 @@ void getTexture(std::vector<Mesh> & data,
 	}
 	std::cout << "primitives.size():" << primitives.size() << std::endl;
 
-	// 构建BVH树
-	bvhTree.BVHBuildTree(primitives);
 
-	// 绑定到纹理中
+
+
+}
+
+void generateTextures(ObjectTexture& objTex, BVHTree& bvhTree, Shader& shader) {
+	
+		// 绑定到纹理中
 	shader.use();
 
 	glGenTextures(1, &objTex.ID_meshTex);
@@ -104,9 +108,8 @@ void getTexture(std::vector<Mesh> & data,
 
 	// 删除数组
 	// 等测试完再删除
+	
 }
-
-
 
 
 
