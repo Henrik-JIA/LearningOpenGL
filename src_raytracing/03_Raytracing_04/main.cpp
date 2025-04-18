@@ -39,7 +39,7 @@ unsigned int SCR_WIDTH = 1200;
 unsigned int SCR_HEIGHT = 800;
 
 // camera value
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 2.0f);
+glm::vec3 cameraPos = glm::vec3(0.0f, 1.0f, 2.5f);
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -136,11 +136,10 @@ int main()
 	// 加载数据纹理
 	Model dragon("../static/model/dragon/dragon.obj");
 	Model bunny("../static/model/bunny/bunny.obj");
-	getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-1.5,-0.2,0.0));
-	getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 4.0, glm::vec3(0.0,-0.3,0.0));
-	//Model box("../static/model/box/box.obj");
-	//getTexture(box.meshes, RayTracerShader, ObjTex, bvhTree, 0.2, glm::vec3(0.0, 0.0, 0.0));
-
+	Model box("../static/model/box/box.obj");
+	getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-0.7,-0.2,0.0));
+	getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 3.0, glm::vec3(0.0,-0.3,0.0));
+	getTexture(box.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.2, glm::vec3(0.7, 0.0, 0.0));
 
 	// 构建BVH树
 	bvhTree.BVHBuildTree(primitives);
@@ -212,7 +211,7 @@ int main()
 			RayTracerShader.setInt("sphere[3].materialIndex", 0);
 			RayTracerShader.setVec3("sphere[3].albedo", glm::vec3(0.9, 0.9, 0.9));
 			// 三角形赋值
-			float floorHfW = 1.0, upBias = -0.22;
+			float floorHfW = 1.2, upBias = -0.22;
 			RayTracerShader.setVec3("triFloor[0].v0", glm::vec3(-floorHfW, upBias, floorHfW));
 			RayTracerShader.setVec3("triFloor[0].v1", glm::vec3(-floorHfW, upBias, -floorHfW));
 			RayTracerShader.setVec3("triFloor[0].v2", glm::vec3(floorHfW, upBias, floorHfW));

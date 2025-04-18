@@ -226,8 +226,12 @@ bool IntersectBVH(Ray ray) {
 	if (hit) {
 		rec.Pos = ray.origin + ray.hitMin * ray.direction;
 		// 我也不清楚模型的顶点坐标是顺时针还是逆时针，加负号效果是对的。
-		rec.Normal = -getTriangleNormal(tri);
-		rec.albedo = vec3(0.83, 0.73, 0.1);
+		// rec.Normal = -getTriangleNormal(tri);
+		// 下面注释的glsl代码可以解决面法向量始终超外，但会影响帧率
+		vec3 rawNormal = getTriangleNormal(tri);
+		rec.Normal = (dot(rawNormal, -ray.direction) > 0.0) ? rawNormal : -rawNormal;
+		// rec.albedo = vec3(0.83, 0.73, 0.1); 
+		rec.albedo = rec.Normal * 0.5 + 0.5; // 法线可视化
 		rec.rayHitMin = ray.hitMin;
 		rec.materialIndex = 0;
 	}
@@ -336,7 +340,7 @@ vec3 metalReflection(vec3 rayIn, vec3 Normal) {
 
 vec3 shading(Ray r) {
 	vec3 color = vec3(1.0,1.0,1.0);
-	for (int i = 0; i < 20; i++) {
+	for (int i = 0; i < 50; i++) {
 		if (hitWorld(r)) {
 			
 			if(rec.materialIndex == 0)

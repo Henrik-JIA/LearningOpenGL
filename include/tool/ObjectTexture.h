@@ -74,9 +74,6 @@ void getTexture(const std::vector<Mesh> & data,
 	}
 	std::cout << "primitives.size():" << primitives.size() << std::endl;
 
-
-
-
 }
 
 void generateTextures(ObjectTexture& objTex, BVHTree& bvhTree, Shader& shader) {
@@ -108,7 +105,6 @@ void generateTextures(ObjectTexture& objTex, BVHTree& bvhTree, Shader& shader) {
 
 	// 删除数组
 	// 等测试完再删除
-	
 }
 
 
