@@ -51,6 +51,8 @@ struct Triangle {
 	vec3 v0, v1, v2;
 	vec3 n0, n1, n2;
 	vec2 u0, u1, u2;
+	vec3 albedo;
+	int materialType;
 };
 uniform Triangle triFloor[2];
 
@@ -200,6 +202,15 @@ bool IntersectBVH(Ray ray) {
 						ray.hitMin = dis_t;
 						tri = tri_t;
 						hit = true;
+
+						// // === 在这里更新 rec ===
+                        // rec.Pos = ray.origin + ray.hitMin * ray.direction;
+                        // vec3 rawNormal = getTriangleNormal(tri_t); // 使用 tri_t
+                        // rec.Normal = (dot(rawNormal, -ray.direction) > 0.0) ? rawNormal : -rawNormal;
+                        // rec.albedo = tri_t.albedo; // 使用 tri_t
+                        // rec.materialIndex = tri_t.materialType; // 使用 tri_t
+                        // rec.rayHitMin = ray.hitMin;
+                        // // =======================
 					}
 				}
 				if (toVisitOffset == 0) break;
@@ -230,10 +241,12 @@ bool IntersectBVH(Ray ray) {
 		// 下面注释的glsl代码可以解决面法向量始终超外，但会影响帧率
 		vec3 rawNormal = getTriangleNormal(tri);
 		rec.Normal = (dot(rawNormal, -ray.direction) > 0.0) ? rawNormal : -rawNormal;
-		rec.albedo = vec3(0.83, 0.73, 0.1); 
+		// rec.albedo = vec3(0.83, 0.73, 0.1); 
 		// rec.albedo = rec.Normal * 0.5 + 0.5; // 法线可视化
+		rec.albedo = tri.albedo;
 		rec.rayHitMin = ray.hitMin;
-		rec.materialIndex = 0;
+		// rec.materialIndex = 0;
+		rec.materialIndex = tri.materialType;
 	}
 	return hit;
 }
@@ -248,18 +261,40 @@ float At(sampler2D dataTex, float index) {
 
 Triangle getTriangle(int index) {
 	Triangle tri_t;
-	int offset = index * (9 + 9 + 6);
+	int offset = index * (9 + 9 + 6 + 3 + 1);
 	tri_t.v0.x = At(texMesh, float(offset));
 	tri_t.v0.y = At(texMesh, float(offset + 1));
 	tri_t.v0.z = At(texMesh, float(offset + 2));
-
 	tri_t.v1.x = At(texMesh, float(offset + 3));
 	tri_t.v1.y = At(texMesh, float(offset + 4));
 	tri_t.v1.z = At(texMesh, float(offset + 5));
-
 	tri_t.v2.x = At(texMesh, float(offset + 6));
 	tri_t.v2.y = At(texMesh, float(offset + 7));
 	tri_t.v2.z = At(texMesh, float(offset + 8));
+
+	tri_t.n0.x = At(texMesh, float(offset + 9));
+	tri_t.n0.y = At(texMesh, float(offset + 10));
+	tri_t.n0.z = At(texMesh, float(offset + 11));
+	tri_t.n1.x = At(texMesh, float(offset + 12));
+	tri_t.n1.y = At(texMesh, float(offset + 13));
+	tri_t.n1.z = At(texMesh, float(offset + 14));
+	tri_t.n2.x = At(texMesh, float(offset + 15));
+	tri_t.n2.y = At(texMesh, float(offset + 16));
+	tri_t.n2.z = At(texMesh, float(offset + 17));
+
+	tri_t.u0.x = At(texMesh, float(offset + 18));
+	tri_t.u0.y = At(texMesh, float(offset + 19));
+	tri_t.u1.x = At(texMesh, float(offset + 20));
+	tri_t.u1.y = At(texMesh, float(offset + 21));
+	tri_t.u2.x = At(texMesh, float(offset + 22));
+	tri_t.u2.y = At(texMesh, float(offset + 23));
+
+	tri_t.albedo.r = At(texMesh, float(offset + 24));
+	tri_t.albedo.g = At(texMesh, float(offset + 25));
+	tri_t.albedo.b = At(texMesh, float(offset + 26));
+
+	tri_t.materialType = int(At(texMesh, float(offset + 27)));
+
 	return tri_t;
 }
 

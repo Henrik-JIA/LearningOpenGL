@@ -12,6 +12,8 @@ public:
 	glm::vec3 v0, v1, v2;
 	glm::vec3 n0, n1, n2;
 	glm::vec2 u0, u1, u2;
+	glm::vec3 albedo;
+	glm::int8 materialType;
 };
 
 struct Bound3f {

@@ -126,8 +126,7 @@ public:
 		flattenBVHTree(root, &offset);
 
 		meshNum = primitives.size();
-		// int stride = 9 + 9 + 6 + 3 + 1;
-		int stride = 9 + 9 + 6;
+		int stride = 9 + 9 + 6 + 3 + 1;
 		int meshNumSize = meshNum * stride;
 		float mesh_x_f = sqrtf(meshNumSize);
 		meshNumX = ceilf(mesh_x_f);

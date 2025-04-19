@@ -18,7 +18,7 @@ enum Camera_Movement
 
 // Default camera values
 const float YAW = -90.0f;
-const float PITCH = -30.0f;
+const float PITCH = -15.0f;
 const float KEYBOARD_MOVEMENT_SPEED = 2.5f;
 const float ROTATION_SENSITIVITY = 0.2f;
 const float PAN_SENSITIVITY = 0.02f;
@@ -72,7 +72,7 @@ public:
 	// 默认值PITCH = 0.0f，平视
 	Camera( int ScreenWidth, 
 			int ScreenHeight,
-			glm::vec3 position = glm::vec3(0.0f, 1.0f, 2.5f), 
+			glm::vec3 position = glm::vec3(0.0f, 0.5f, 2.5f), 
 			glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), 
 			float yaw = YAW, 
 			float pitch = PITCH

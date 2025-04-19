@@ -14,8 +14,10 @@
 #include <tool/RandomUtils.h> // 这个就对应Tool.h文件
 #include <tool/Camera.h> // 这个就是对应Camera.h文件
 #include <tool/TimeRecorder.h> // 这个就是对应Camera.h文件
-#include <tool/BVHTree.h>
-#include <tool/ObjectTexture.h>
+// #include <tool/ObjectTexture.h>
+
+#include "include/BVHTree.h"
+#include "include/ObjectTexture.h"
 
 #include <tool/gui.h>
 
@@ -39,7 +41,7 @@ unsigned int SCR_WIDTH = 1200;
 unsigned int SCR_HEIGHT = 800;
 
 // camera value
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.5f, 2.0f);
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.5f, 2.5f);
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -123,8 +125,8 @@ int main()
 	CPURandomInit();
 
 	// 加载着色器
-	Shader RayTracerShader = Shader::FromFile("../src_raytracing/03_Raytracing_04/shader/RayTracerVertexShader.glsl", "../src_raytracing/03_Raytracing_04/shader/RayTracerFragmentShader.glsl");
-	Shader ScreenShader = Shader::FromFile("../src_raytracing/03_Raytracing_04/shader/ScreenVertexShader.glsl", "../src_raytracing/03_Raytracing_04/shader/ScreenFragmentShader.glsl");
+	Shader RayTracerShader = Shader::FromFile("../src_raytracing/03_Raytracing_05/shader/RayTracerVertexShader.glsl", "../src_raytracing/03_Raytracing_05/shader/RayTracerFragmentShader.glsl");
+	Shader ScreenShader = Shader::FromFile("../src_raytracing/03_Raytracing_05/shader/ScreenVertexShader.glsl", "../src_raytracing/03_Raytracing_05/shader/ScreenFragmentShader.glsl");
 
 	// 绑定屏幕的坐标位置
 	RT_Screen screen;
@@ -134,12 +136,41 @@ int main()
 	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
 	
 	// 加载数据纹理
-	Model dragon("../static/model/dragon/dragon.obj");
-	Model bunny("../static/model/bunny/bunny.obj");
-	Model box("../static/model/box/box.obj");
-	getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-0.7,-0.2,0.0));
-	getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 3.0, glm::vec3(0.0,-0.3,0.0));
-	getTexture(box.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.2, glm::vec3(0.7, 0.0, 0.0));
+	// Model dragon("../static/model/dragon/dragon.obj");
+	// Model bunny("../static/model/bunny/bunny.obj");
+	// Model box("../static/model/box/box.obj");
+	// getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-0.7,-0.2,0.0));
+	// getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 3.0, glm::vec3(0.0,-0.3,0.0));
+	// getTexture(box.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.2, glm::vec3(0.7, 0.0, 0.0));
+
+	// 加载CornellBox
+	Model tallbox("../static/model/cornellbox/tallbox.obj");
+	getTextureWithTransform(tallbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							glm::vec3(0.725f, 0.71f, 0.68f), 0); // 白色
+	Model shortbox("../static/model/cornellbox/shortbox.obj");
+	getTextureWithTransform(shortbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							glm::vec3(0.725f, 0.71f, 0.68f), 0); // 白色
+	
+	Model floor("../static/model/cornellbox/floor.obj");
+	getTextureWithTransform(floor.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							glm::vec3(0.725f, 0.71f, 0.68f), 0); // 白色
+	Model right("../static/model/cornellbox/right.obj");
+	getTextureWithTransform(right.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							glm::vec3(0.14f, 0.45f, 0.091f), 0); // 绿色
+	Model left("../static/model/cornellbox/left.obj");
+	getTextureWithTransform(left.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							glm::vec3(0.63f, 0.065f, 0.05f), 0); // 红色
+
+	Model light("../static/model/cornellbox/light.obj");
+	getTextureWithTransform(light.meshes, RayTracerShader, ObjTex, primitives, bvhTree,
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							glm::vec3(1.0f, 1.0f, 1.0f), 1);
+
 
 	// 构建BVH树
 	bvhTree.BVHBuildTree(primitives);
@@ -211,7 +242,7 @@ int main()
 			RayTracerShader.setInt("sphere[3].materialIndex", 0);
 			RayTracerShader.setVec3("sphere[3].albedo", glm::vec3(0.9, 0.9, 0.9));
 			// 三角形赋值
-			float floorHfW = 1.1, upBias = -0.22;
+			float floorHfW = 1.0, upBias = -0.22;
 			RayTracerShader.setVec3("triFloor[0].v0", glm::vec3(-floorHfW, upBias, floorHfW));
 			RayTracerShader.setVec3("triFloor[0].v1", glm::vec3(-floorHfW, upBias, -floorHfW));
 			RayTracerShader.setVec3("triFloor[0].v2", glm::vec3(floorHfW, upBias, floorHfW));
