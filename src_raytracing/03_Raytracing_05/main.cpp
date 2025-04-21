@@ -14,11 +14,8 @@
 #include <tool/RandomUtils.h> // 这个就对应Tool.h文件
 #include <tool/Camera.h> // 这个就是对应Camera.h文件
 #include <tool/TimeRecorder.h> // 这个就是对应Camera.h文件
-// #include <tool/ObjectTexture.h>
-
-#include "include/BVHTree.h"
-#include "include/ObjectTexture.h"
-
+#include <tool/BVHTree.h>
+#include <tool/ObjectTexture.h>
 #include <tool/gui.h>
 
 #include <tool/RenderBuffer.h> // 这个就对应RT_Screen.h文件
@@ -134,6 +131,23 @@ int main()
 
 	// 生成屏幕FrameBuffer
 	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
+
+    Material light;
+    light.transmission = -1.0f;
+    light.emissive = 8.0f * glm::vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * glm::vec3 (0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f * glm::vec3(0.737f+0.642f,0.737f+0.159f,0.737f);
+
+    Material red;
+    red.transmission = 0.0f;
+    red.baseColor = glm::vec3(0.63f, 0.065f, 0.05f);
+
+    Material green;
+    red.transmission = 0.0f;
+    green.baseColor = glm::vec3(0.14f, 0.45f, 0.091f);
+
+    Material white;
+    white.transmission = 0.0f;
+    white.baseColor = glm::vec3(0.725f, 0.71f, 0.68f);
+
 	
 	// 加载数据纹理
 	// Model dragon("../static/model/dragon/dragon.obj");
@@ -147,33 +161,34 @@ int main()
 	Model tallbox("../static/model/cornellbox/tallbox.obj");
 	getTextureWithTransform(tallbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							glm::vec3(0.725f, 0.71f, 0.68f), 0); // 白色
+							white); // 白色
 	Model shortbox("../static/model/cornellbox/shortbox.obj");
 	getTextureWithTransform(shortbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							glm::vec3(0.725f, 0.71f, 0.68f), 0); // 白色
+							white); // 白色
 	
 	Model floor("../static/model/cornellbox/floor.obj");
 	getTextureWithTransform(floor.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							glm::vec3(0.725f, 0.71f, 0.68f), 0); // 白色
+							white); // 白色
 	Model right("../static/model/cornellbox/right.obj");
 	getTextureWithTransform(right.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							glm::vec3(0.14f, 0.45f, 0.091f), 0); // 绿色
+							green); // 绿色
 	Model left("../static/model/cornellbox/left.obj");
 	getTextureWithTransform(left.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							glm::vec3(0.63f, 0.065f, 0.05f), 0); // 红色
+							red); // 红色
 
-	Model light("../static/model/cornellbox/light.obj");
-	getTextureWithTransform(light.meshes, RayTracerShader, ObjTex, primitives, bvhTree,
+	Model areaLight("../static/model/cornellbox/light.obj");
+	glm::vec3 lightEmissive = 8.0f * glm::vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * glm::vec3 (0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f * glm::vec3(0.737f+0.642f,0.737f+0.159f,0.737f);
+	getTextureWithTransform(areaLight.meshes, RayTracerShader, ObjTex, primitives, bvhTree,
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							glm::vec3(1.0f, 1.0f, 1.0f), 1);
+							light);
 
 
 	// 构建BVH树
-	bvhTree.BVHBuildTree(primitives);
+	bvhTree.BVHBuildTree(primitives, 42);
 
     generateTextures(ObjTex, bvhTree, RayTracerShader);
 

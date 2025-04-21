@@ -6,14 +6,32 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+struct Material {
+    glm::vec3 emissive = glm::vec3(0.0f, 0.0f, 0.0f);  // 作为光源时的发光颜色
+    glm::vec3 baseColor = glm::vec3(0, 0, 0);
+    float subsurface = 0.0;
+    float metallic = 0.0; // 金属度
+    float specular = 0.0;
+    float specularTint = 0.0;
+    float roughness = 0.0; // 粗糙度
+    float anisotropic = 0.0;
+    float sheen = 0.0;
+    float sheenTint = 0.0;
+    float clearcoat = 0.0;
+    float clearcoatGloss = 0.0;
+    float IOR = 1.0;
+    float transmission = 0.0; // 暂时设置为材质属性 {0: DIFFUSE, 1: MICROFACET}
+};
 
 class Triangle {
 public:
 	glm::vec3 v0, v1, v2;
 	glm::vec3 n0, n1, n2;
 	glm::vec2 u0, u1, u2;
-	glm::vec3 albedo;
-	glm::int8 materialType;
+	Material material;
+	// glm::vec3 albedo;
+	// glm::vec3 emissive;
+	// glm::int8 materialType;
 };
 
 struct Bound3f {

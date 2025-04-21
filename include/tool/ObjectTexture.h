@@ -86,8 +86,7 @@ void getTextureWithTransform(const std::vector<Mesh> & data,
 							float scale = 1.0f,
 							float rotateAngle = 0.0f,
 							glm::vec3 rotateAxis = glm::vec3(0.0f, 1.0f, 0.0f), // 默认绕Y轴旋转
-							glm::vec3 albedo = glm::vec3(0.8f),
-							int materialType = 0
+							Material material = Material()
 							) 
 {
 	int dataSize_v = 0, dataSize_f = 0;
@@ -109,6 +108,7 @@ void getTextureWithTransform(const std::vector<Mesh> & data,
     modelMatrix = glm::translate(modelMatrix, position);
     modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
     modelMatrix = glm::rotate(modelMatrix, glm::radians(rotateAngle), rotateAxis);
+	glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(modelMatrix)));
 
     for (int i = 0; i < data.size(); i++) {
         for (int j = 0; j < data[i].indices.size() / 3; j++) {
@@ -122,14 +122,14 @@ void getTextureWithTransform(const std::vector<Mesh> & data,
             tri->v0 = glm::vec3(v0);
             tri->v1 = glm::vec3(v1);
             tri->v2 = glm::vec3(v2);
-	
-			glm::vec4 n0 = modelMatrix * glm::vec4(data[i].vertices[data[i].indices[j*3+0]].Normal, 0.0f);
-			glm::vec4 n1 = modelMatrix * glm::vec4(data[i].vertices[data[i].indices[j*3+1]].Normal, 0.0f);
-			glm::vec4 n2 = modelMatrix * glm::vec4(data[i].vertices[data[i].indices[j*3+2]].Normal, 0.0f);
+
+			glm::vec3 n0 = normalMatrix * glm::vec3(data[i].vertices[data[i].indices[j*3+0]].Normal);
+			glm::vec3 n1 = normalMatrix * glm::vec3(data[i].vertices[data[i].indices[j*3+1]].Normal);
+			glm::vec3 n2 = normalMatrix * glm::vec3(data[i].vertices[data[i].indices[j*3+2]].Normal);
 			
-			tri->n0 = glm::vec3(n0);
-			tri->n1 = glm::vec3(n1);
-			tri->n2 = glm::vec3(n2);
+			tri->n0 = n0;
+			tri->n1 = n1;
+			tri->n2 = n2;
 
 			glm::vec2 u0 = glm::vec2(data[i].vertices[data[i].indices[j*3+0]].TexCoords);
 			glm::vec2 u1 = glm::vec2(data[i].vertices[data[i].indices[j*3+1]].TexCoords);
@@ -139,9 +139,7 @@ void getTextureWithTransform(const std::vector<Mesh> & data,
 			tri->u1 = u1;
 			tri->u2 = u2;
 
-			tri->albedo = albedo;
-
-			tri->materialType = materialType;
+			tri->material = material;
 
             primitives.push_back(tri);
         }

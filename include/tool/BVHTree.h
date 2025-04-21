@@ -100,7 +100,7 @@ public:
 		meshNum = 0;
 	}
 
-	void BVHBuildTree(std::vector<std::shared_ptr<Triangle>> p) {
+	void BVHBuildTree(std::vector<std::shared_ptr<Triangle>> p, int stride = 24) {
 		primitives = std::move(p);
 		if (primitives.empty()) return;
 		// Initialize primitives
@@ -126,49 +126,65 @@ public:
 		flattenBVHTree(root, &offset);
 
 		meshNum = primitives.size();
-		// int stride = 9 + 9 + 6 + 3 + 1;
-		int stride = 9 + 9 + 6;
-		int meshNumSize = meshNum * stride;
+		// int stride_t = 9 + 9 + 6 + 3 + 1;
+		// int stride_t = 9 + 9 + 6;
+		int stride_t = stride;
+		int meshNumSize = meshNum * stride_t;
 		float mesh_x_f = sqrtf(meshNumSize);
 		meshNumX = ceilf(mesh_x_f);
 		meshNumY = ceilf((float)meshNumSize / (float)meshNumX);
 		std::cout << "meshNumX = " << meshNumX << " meshNumY = " << meshNumY << std::endl;
 
-		MeshArray = new float[(meshNumX * meshNumY) * stride];
+		MeshArray = new float[(meshNumX * meshNumY) * stride_t];
 		// 顶点赋值
 		for (int i = 0; i < meshNum; i++) {
-			MeshArray[i * stride + 0] = primitives[i]->v0.x;
-			MeshArray[i * stride + 1] = primitives[i]->v0.y;
-			MeshArray[i * stride + 2] = primitives[i]->v0.z;
-			MeshArray[i * stride + 3] = primitives[i]->v1.x;
-			MeshArray[i * stride + 4] = primitives[i]->v1.y;
-			MeshArray[i * stride + 5] = primitives[i]->v1.z;
-			MeshArray[i * stride + 6] = primitives[i]->v2.x;
-			MeshArray[i * stride + 7] = primitives[i]->v2.y;
-			MeshArray[i * stride + 8] = primitives[i]->v2.z;
+			MeshArray[i * stride_t + 0] = primitives[i]->v0.x;
+			MeshArray[i * stride_t + 1] = primitives[i]->v0.y;
+			MeshArray[i * stride_t + 2] = primitives[i]->v0.z;
+			MeshArray[i * stride_t + 3] = primitives[i]->v1.x;
+			MeshArray[i * stride_t + 4] = primitives[i]->v1.y;
+			MeshArray[i * stride_t + 5] = primitives[i]->v1.z;
+			MeshArray[i * stride_t + 6] = primitives[i]->v2.x;
+			MeshArray[i * stride_t + 7] = primitives[i]->v2.y;
+			MeshArray[i * stride_t + 8] = primitives[i]->v2.z;
 
-			MeshArray[i * stride + 9] = primitives[i]->n0.x;
-			MeshArray[i * stride + 10] = primitives[i]->n0.y;
-			MeshArray[i * stride + 11] = primitives[i]->n0.z;
-			MeshArray[i * stride + 12] = primitives[i]->n1.x;
-			MeshArray[i * stride + 13] = primitives[i]->n1.y;
-			MeshArray[i * stride + 14] = primitives[i]->n1.z;
-			MeshArray[i * stride + 15] = primitives[i]->n2.x;
-			MeshArray[i * stride + 16] = primitives[i]->n2.y;
-			MeshArray[i * stride + 17] = primitives[i]->n2.z;
+			MeshArray[i * stride_t + 9] = primitives[i]->n0.x;
+			MeshArray[i * stride_t + 10] = primitives[i]->n0.y;
+			MeshArray[i * stride_t + 11] = primitives[i]->n0.z;
+			MeshArray[i * stride_t + 12] = primitives[i]->n1.x;
+			MeshArray[i * stride_t + 13] = primitives[i]->n1.y;
+			MeshArray[i * stride_t + 14] = primitives[i]->n1.z;
+			MeshArray[i * stride_t + 15] = primitives[i]->n2.x;
+			MeshArray[i * stride_t + 16] = primitives[i]->n2.y;
+			MeshArray[i * stride_t + 17] = primitives[i]->n2.z;
 
-			MeshArray[i * stride + 18] = primitives[i]->u0.x;
-			MeshArray[i * stride + 19] = primitives[i]->u0.y;
-			MeshArray[i * stride + 20] = primitives[i]->u1.x;
-			MeshArray[i * stride + 21] = primitives[i]->u1.y;
-			MeshArray[i * stride + 22] = primitives[i]->u2.x;
-			MeshArray[i * stride + 23] = primitives[i]->u2.y;
+			MeshArray[i * stride_t + 18] = primitives[i]->u0.x;
+			MeshArray[i * stride_t + 19] = primitives[i]->u0.y;
+			MeshArray[i * stride_t + 20] = primitives[i]->u1.x;
+			MeshArray[i * stride_t + 21] = primitives[i]->u1.y;
+			MeshArray[i * stride_t + 22] = primitives[i]->u2.x;
+			MeshArray[i * stride_t + 23] = primitives[i]->u2.y;
 
-			MeshArray[i * stride + 24] = primitives[i]->albedo.x;
-			MeshArray[i * stride + 25] = primitives[i]->albedo.y;
-			MeshArray[i * stride + 26] = primitives[i]->albedo.z;
+			MeshArray[i * stride_t + 24] = primitives[i]->material.emissive.x;
+			MeshArray[i * stride_t + 25] = primitives[i]->material.emissive.y;
+			MeshArray[i * stride_t + 26] = primitives[i]->material.emissive.z;
 
-			MeshArray[i * stride + 27] = primitives[i]->materialType;
+			MeshArray[i * stride_t + 27] = primitives[i]->material.baseColor.x;
+			MeshArray[i * stride_t + 28] = primitives[i]->material.baseColor.y;
+			MeshArray[i * stride_t + 29] = primitives[i]->material.baseColor.z;
+
+			MeshArray[i * stride_t + 30] = primitives[i]->material.subsurface;
+			MeshArray[i * stride_t + 31] = primitives[i]->material.metallic;
+			MeshArray[i * stride_t + 32] = primitives[i]->material.specular;
+			MeshArray[i * stride_t + 33] = primitives[i]->material.specularTint;
+			MeshArray[i * stride_t + 34] = primitives[i]->material.roughness;
+			MeshArray[i * stride_t + 35] = primitives[i]->material.anisotropic;
+			MeshArray[i * stride_t + 36] = primitives[i]->material.sheen;
+			MeshArray[i * stride_t + 37] = primitives[i]->material.sheenTint;
+			MeshArray[i * stride_t + 38] = primitives[i]->material.clearcoat;
+			MeshArray[i * stride_t + 39] = primitives[i]->material.clearcoatGloss;
+			MeshArray[i * stride_t + 40] = primitives[i]->material.IOR;
+			MeshArray[i * stride_t + 41] = primitives[i]->material.transmission;
 		}
 
 		int nodeNumSize = nodeNum * (9);
