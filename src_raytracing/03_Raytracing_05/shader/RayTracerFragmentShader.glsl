@@ -143,15 +143,15 @@ void main() {
 	cameraRay.hitMin = 100000.0;
 
 	vec3 curColor = vec3(0.0, 0.0, 0.0);
-	int N = 5;
+	int N = 2;
 	for (int i = 0; i < N; i++) 
 	{
 		if(IntersectBVH(cameraRay)) {
 			curColor += shading(cameraRay);
 		}else{
-			// float t = 0.5 * (cameraRay.direction.y + 1.0);
-			// vec3 bgColor = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-			vec3 bgColor = vec3(0.0, 0.0, 0.0);
+			float t = 0.5 * (cameraRay.direction.y + 1.0);
+			vec3 bgColor = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+			// vec3 bgColor = vec3(0.0, 0.0, 0.0);
 			curColor += bgColor;
 		}
 	}
@@ -761,6 +761,39 @@ vec3 shading(Ray r) {
 				}
                 break;
             }
+			case 1: // 金属
+			{
+				vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
+				float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
+				// vec3 f_r = rec.material.baseColor / PI; // 漫反射系数
+				vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+				float cosine = max(0.0, dot(dir_next, rec.Normal));
+				if (pdf > EPSILON) 
+				{
+					Ray rayNext;
+					rayNext.origin = rec.Pos + rec.Normal * 0.001;
+					rayNext.direction = dir_next;
+					rayNext.hitMin = 100000;
+					bool hitNext = IntersectBVH(rayNext);
+					if (hitNext) 
+					{
+						throughput = throughput * (f_r * cosine) / pdf / P_RR;
+					}
+					else
+					{
+						throughput = vec3(0.0);
+						flag = 0;
+						break;
+					}
+				}
+				else
+				{
+					throughput = vec3(0.0);
+					flag = 0;
+					break;
+				}
+                break;
+			}
         }
     }
     return Lo;

@@ -122,8 +122,8 @@ int main()
 	CPURandomInit();
 
 	// 加载着色器
-	Shader RayTracerShader = Shader::FromFile("../src_raytracing/03_Raytracing_05/shader/RayTracerVertexShader.glsl", "../src_raytracing/03_Raytracing_05/shader/RayTracerFragmentShader.glsl");
-	Shader ScreenShader = Shader::FromFile("../src_raytracing/03_Raytracing_05/shader/ScreenVertexShader.glsl", "../src_raytracing/03_Raytracing_05/shader/ScreenFragmentShader.glsl");
+	Shader RayTracerShader = Shader::FromFile("../src_raytracing/03_Raytracing_06/shader/RayTracerVertexShader.glsl", "../src_raytracing/03_Raytracing_06/shader/RayTracerFragmentShader.glsl");
+	Shader ScreenShader = Shader::FromFile("../src_raytracing/03_Raytracing_06/shader/ScreenVertexShader.glsl", "../src_raytracing/03_Raytracing_06/shader/ScreenFragmentShader.glsl");
 
 	// 绑定屏幕的坐标位置
 	RT_Screen screen;
@@ -142,12 +142,17 @@ int main()
     red.baseColor = glm::vec3(0.63f, 0.065f, 0.05f);
 
     Material green;
-    red.transmission = 0.0f;
+    green.transmission = 0.0f;
     green.baseColor = glm::vec3(0.14f, 0.45f, 0.091f);
 
     Material white;
     white.transmission = 0.0f;
     white.baseColor = glm::vec3(0.725f, 0.71f, 0.68f);
+
+    Material white2;
+    white2.transmission = 1.0f;
+    white2.roughness = 0.01f;
+    white2.baseColor = glm::vec3(0.725f, 0.71f, 0.68f);
 
 	
 	// 加载数据纹理
@@ -162,7 +167,7 @@ int main()
 	Model tallbox("../static/model/cornellbox/tallbox.obj");
 	getTextureWithTransform(tallbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							white); // 白色
+							white2); // 白色
 	Model shortbox("../static/model/cornellbox/shortbox.obj");
 	getTextureWithTransform(shortbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),

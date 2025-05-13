@@ -20,7 +20,7 @@ struct Material {
     float clearcoat = 0.0;
     float clearcoatGloss = 0.0;
     float IOR = 1.0;
-    float transmission = 0.0; // 暂时设置为材质属性 {0: DIFFUSE, 1: MICROFACET}
+    float transmission = 0.0; // 暂时设置为材质属性 {-1: LIGHT,0: DIFFUSE, 1: MICROFACET}
 };
 
 class Triangle {

@@ -143,7 +143,7 @@ void main() {
 	cameraRay.hitMin = 100000.0;
 
 	vec3 curColor = vec3(0.0, 0.0, 0.0);
-	int N = 5;
+	int N = 2;
 	for (int i = 0; i < N; i++) 
 	{
 		if(IntersectBVH(cameraRay)) {
@@ -495,15 +495,40 @@ vec3 sample_(vec3 wo, vec3 N, Material material){
 			break;
 		}
 		case 1: {
-			// 随机一个 ε 和 φ
+			// // 随机一个 ε 和 φ
+			// float r0 = rand();
+			// float r1 = rand();
+			// float a2 = material.roughness * material.roughness;
+			// float phi = 2 * PI * r1;
+			// float theta = cos(sqrt((1 - r0) / (r0 * (a2 - 1) + 1)));
+			// // 单位向量半径就直接 1 了，转换为直角坐标系只需要用到 r*sinθ，所以这里直接乘上去了
+			// float r = sin(theta);
+			// dir = reflect(-wo, toWorld(vec3(r * cos(phi), r * sin(phi), cos(theta)), N));
+			
+			// GGX重要性采样（修正版）
 			float r0 = rand();
 			float r1 = rand();
-			float a2 = material.roughness * material.roughness;
-			float phi = 2 * PI * r1;
-			float theta = cos(sqrt((1 - r0) / (r0 * (a2 - 1) + 1)));
-			// 单位向量半径就直接 1 了，转换为直角坐标系只需要用到 r*sinθ，所以这里直接乘上去了
-			float r = sin(theta);
-			dir = reflect(-wo, toWorld(vec3(r * cos(phi), r * sin(phi), cos(theta)), N));
+			float a = material.roughness;
+			float a2 = a * a;
+
+			// 生成GGX分布的微表面法线
+			float phi = 2.0 * PI * r1;
+			float cosTheta = sqrt((1.0 - r0) / (r0 * (a2 - 1.0) + 1.0));
+			float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+			// 在局部坐标系构造半程向量
+			vec3 localH = vec3(
+				sinTheta * cos(phi),
+				sinTheta * sin(phi),
+				cosTheta
+			);
+
+			// 转换到世界坐标系
+			vec3 H = toWorld(localH, N);
+
+			// 计算反射方向（假设wo是从表面到相机的出射方向）
+			dir = normalize(reflect(-wo, H));
+			
 			break;
 		}
 	}
@@ -537,8 +562,9 @@ float pdf_(vec3 wo, vec3 wi, vec3 N, Material material){
 		}
 		case 1: {
 			if (cosalpha_i_N > EPSILON) {
-				vec3 h = normalize(wo + wi);
-				pdf = DistributionGGX(N, h, material.roughness) * dot(N, h) / (4.f * dot(wo, h));
+				// vec3 h = normalize(wo + wi);
+				// pdf = DistributionGGX(N, h, material.roughness) * dot(N, h) / (4.f * dot(wo, h));
+				pdf = 1.0;
 			}else{
 				pdf =  0.0f;
 			}
@@ -615,34 +641,102 @@ vec3 eval_(vec3 wi, vec3 wo, vec3 N, Material material) {
 			break;
 		}
 		case 1: {
-			// cosθ是入射光和法线的夹角，也就是光源方向和法线方向的夹角
+			// // cosθ是入射光和法线的夹角，也就是光源方向和法线方向的夹角
+			// float cosTheta = dot(N, wo);
+			// if(cosTheta > EPSILON) {
+			// 	vec3 V = wi;
+			// 	vec3 L = wo;
+			// 	vec3 H = normalize(V + L);
+			// 	float NdotV = max(dot(N, V), EPSILON);
+			// 	float NdotL = cosTheta;
+			// 	// 直接光照情况下的 k 公式
+			// 	float k = (material.roughness + 1.f) * (material.roughness + 1.f) / 8.f;
+			// 	float D = DistributionGGX(N, H, material.roughness);
+			// 	float G = GeometrySmith(NdotV, NdotL, k);
+
+			// 	vec3 F0 = vec3(0.04f);
+			// 	F0 = lerp(F0, material.baseColor, material.metallic);
+			// 	vec3 F = fresnelSchlick(dot(H, V), F0);
+			// 	// float F;
+			// 	// fresnel(-V, N, ior, F);
+			// 	vec3 fs = D * G * F / (4.f * NdotV  * NdotL);
+
+			// 	// std::cout << fs <<std::endl;
+			// 	// 菲涅尔项就是 ks， kd = 1-ks;
+			// 	vec3 fr =  material.baseColor / PI;
+
+			// 	// return (Vector3f(1.0f) - F0) * fr + F0 * fs;
+			// 	f_r = (vec3(1.0f) - F) * (1 - material.metallic) * fr + fs;
+			// }else {
+			// 	f_r = vec3(0.f);
+			// }
+			// break;
+
+			// ===============
+			// float cosTheta = dot(N, wo);
+			// if(cosTheta > EPSILON) {
+			// 	vec3 V = normalize(-wo);  // 视线方向
+			// 	vec3 L = wi;              // 光线方向
+			// 	vec3 H = normalize(V + L);
+				
+			// 	float NdotV = max(dot(N, V), EPSILON);
+			// 	float NdotL = max(dot(N, L), EPSILON);
+			// 	float NdotH = max(dot(N, H), EPSILON);
+			// 	float VdotH = max(dot(V, H), EPSILON);
+
+			// 	// 计算各项参数
+			// 	float D = DistributionGGX(N, H, material.roughness);
+			// 	float G = GeometrySmith(NdotV, NdotL, material.roughness);
+			// 	vec3 F = fresnelSchlick(VdotH, mix(vec3(0.04), material.baseColor, material.metallic));
+
+			// 	// 完整的Cook-Torrance BRDF
+			// 	vec3 numerator = D * G * F;
+			// 	float denominator = 4.0 * NdotV * NdotL;
+			// 	vec3 specular = numerator / max(denominator, 0.001);
+
+			// 	// 金属材质没有漫反射分量
+			// 	vec3 kD = (1.0 - F) * (1.0 - material.metallic);
+			// 	f_r = kD * material.baseColor / PI + specular;
+			// }
+			// else 
+			// {
+			// 	f_r = vec3(0.0);
+			// }
+			// break;
+			// ================
+
 			float cosTheta = dot(N, wo);
 			if(cosTheta > EPSILON) {
-				vec3 V = wi;
-				vec3 L = wo;
+				// 修正向量方向定义
+				vec3 V = normalize(-wo);  // 视线方向（从表面到相机）
+				vec3 L = wi;              // 光线方向（入射方向）
 				vec3 H = normalize(V + L);
+
+				// 计算各点积项
 				float NdotV = max(dot(N, V), EPSILON);
-				float NdotL = cosTheta;
-				// 直接光照情况下的 k 公式
-				float k = (material.roughness + 1.f) * (material.roughness + 1.f) / 8.f;
-				float D = DistributionGGX(N, H, material.roughness);
-				float G = GeometrySmith(NdotV, NdotL, k);
+				float NdotL = max(dot(N, L), EPSILON);
+				float NdotH = max(dot(N, H), EPSILON);
+				float VdotH = max(dot(V, H), EPSILON);
 
-				vec3 F0 = vec3(0.04f);
-				F0 = lerp(F0, material.baseColor, material.metallic);
-				vec3 F = fresnelSchlick(dot(H, V), F0);
-				// float F;
-				// fresnel(-V, N, ior, F);
-				vec3 fs = D * G * F / (4.f * NdotV  * NdotL);
+				// 使用粗糙度的平方进行物理校正
+				float roughness = material.roughness * material.roughness;
+				
+				// 计算各项参数
+				float D = DistributionGGX(N, H, roughness);
+				float G = GeometrySmith(NdotV, NdotL, roughness);
+				vec3 F0 = mix(vec3(0.04), material.baseColor, material.metallic); // 正确的F0混合
+				vec3 F = fresnelSchlick(VdotH, F0);
 
-				// std::cout << fs <<std::endl;
-				// 菲涅尔项就是 ks， kd = 1-ks;
-				vec3 fr =  material.baseColor / PI;
+				// Cook-Torrance BRDF
+				vec3 numerator = D * G * F;
+				float denominator = 4.0 * NdotV * NdotL;
+				vec3 specular = numerator / max(denominator, 0.001);
 
-				// return (Vector3f(1.0f) - F0) * fr + F0 * fs;
-				f_r = (vec3(1.0f) - F) * (1 - material.metallic) * fr + fs;
-			}else {
-				f_r = vec3(0.f);
+				// 金属材质漫反射衰减
+				vec3 kD = (vec3(1.0) - F) * (1.0 - material.metallic);
+				f_r = kD * material.baseColor / PI + specular;
+			} else {
+				f_r = vec3(0.0);
 			}
 			break;
 		}
@@ -652,65 +746,11 @@ vec3 eval_(vec3 wi, vec3 wo, vec3 N, Material material) {
 
 // =========================================================
 
-vec3 diffuseReflection(vec3 Normal) {
-	// return normalize(Normal + random_in_unit_sphere());
-	return normalize(Normal + random_in_unit_hemisphere(Normal));
-}
-
-vec3 metalReflectionRough(vec3 rayIn, vec3 Normal, float roughness) {
-	vec3 jitter = roughness * random_in_unit_sphere();
-	return normalize(rayIn - 2 * dot(rayIn, Normal) * Normal + jitter);
-}
-
-vec3 metalReflection(vec3 rayIn, vec3 Normal) {
-	vec3 jitter = 0.01 * random_in_unit_sphere();
-	return normalize(rayIn - 2 * dot(rayIn, Normal) * Normal + jitter);
-}
-
-// ========================================================
-
-// vec3 shading(Ray r) {
-// 	vec3 throughput = vec3(1.0); // 辐射通量
-// 	vec3 Lo = vec3(0.0, 0.0, 0.0); // 出射辐射率
-// 	float P_RR = 0.8; // 俄罗斯轮盘赌概率
-
-// 	for(int depth=0; depth<20; depth++) { 
-// 		if (rand() > P_RR) break;  // 俄罗斯轮盘赌判断
-
-// 		if (!IntersectBVH(r)) break; // 光线没有与场景中的物体相交，则终止
-
-// 		switch(rec.material.transmission) {
-// 			case -1: // 光源
-// 			{
-// 				Lo += throughput * rec.material.emissive / P_RR;
-//                 return Lo;  // 击中光源立即返回
-// 			}
-// 			case 0: // 漫反射
-// 			{
-// 				vec3 wo = rec.viewDir;
-// 				vec3 wi = sample_(wo, rec.Normal, rec.material);
-// 				vec3 f_r = rec.material.baseColor; // 漫反射系数
-// 				float cosine = max(0.0, dot(rec.Normal, wi)); // 余弦值
-// 				float pdf = pdf_(wo, wi, rec.Normal, rec.material); // 概率密度函数
-// 				throughput *= (f_r * cosine / pdf) / P_RR;
-
-// 				// 更新光线
-//                 r.origin = rec.Pos;
-//                 r.direction = wi;
-//                 r.hitMin = 100000;
-// 				break;
-// 			}
-// 		}
-// 	}
-// 	return Lo;
-// }
-
 vec3 shading(Ray r) {
     vec3 throughput = vec3(1.0);
     vec3 Lo = vec3(0.0);
 	int flag = 1;
-    // float P_RR = 0.8;
-	float P_RR = 1.0;
+    float P_RR = 0.8;
 
     for(int depth=0; depth<60; depth++) {
 		if (flag == 0) break;
@@ -719,7 +759,7 @@ vec3 shading(Ray r) {
         if (depth > 3 && rand() > P_RR) break;
 
         // 根据命中点材质类型处理光照
-        switch(rec.material.transmission) {
+        switch(int(rec.material.transmission)) {
             case -1: // 光源材质
             {   
 				// float cosine = max(0.0, dot(rec.Normal, rec.viewDir));
@@ -761,106 +801,44 @@ vec3 shading(Ray r) {
 				}
                 break;
             }
+			case 1: // 金属
+			{
+				vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
+				float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
+				// vec3 f_r = rec.material.baseColor / PI; // 漫反射系数
+				vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+				// float cosine = max(0.0, dot(dir_next, rec.Normal));
+				if (pdf > EPSILON) 
+				{
+					Ray rayNext;
+					rayNext.origin = rec.Pos + rec.Normal * 0.001;
+					rayNext.direction = dir_next;
+					rayNext.hitMin = 100000;
+					bool hitNext = IntersectBVH(rayNext);
+					if (hitNext) 
+					{
+						throughput = throughput * (f_r) / pdf / P_RR;
+					}
+					else
+					{
+						throughput = vec3(0.0);
+						flag = 0;
+						break;
+					}
+				}
+				else
+				{
+					throughput = vec3(0.0);
+					flag = 0;
+					break;
+				}
+                break;
+			}
         }
     }
     return Lo;
 }
 // =========================================================
-
-// vec3 shading(Ray r) {
-	
-// 	vec3 Lo = vec3(0.0, 0.0, 0.0);
-
-// 	float P_RR = 0.8; // 俄罗斯轮盘赌概率
-// 	if (rand() > P_RR) return vec3(0.0);
-
-// 	// 判断入射光线是否与场景中的物体相交
-// 	if (IntersectBVH(r)) 
-// 	{
-// 		switch(rec.material.transmission) 
-// 		{
-// 			case -1: // 光源
-// 			{
-// 				vec3 wo = rec.viewDir;
-// 				vec3 wi = sample_(wo, rec.Normal, rec.material);
-// 				vec3 f_r = rec.material.baseColor; // 漫反射系数
-// 				float cosine = max(0.0, dot(rec.Normal, wi)); // 余弦值
-// 				float pdf = pdf_(wo, wi, rec.Normal, rec.material); // 概率密度函数
-// 				vec3 L_i = rec.material.emissive; // 光源辐射率
-// 				Lo = (L_i * f_r * cosine / pdf)	/ P_RR; // 计算光照
-// 				break;
-// 			}
-// 			case 0: // 漫反射
-// 			{
-// 				vec3 wo = rec.viewDir;
-// 				vec3 wi = sample_(wo, rec.Normal, rec.material);
-// 				r.direction = wi;
-// 				r.origin = rec.Pos;
-// 				r.hitMin = 100000;
-// 				vec3 f_r = rec.material.baseColor; // 漫反射系数
-// 				float cosine = max(0.0, dot(rec.Normal, wi)); // 余弦值
-// 				float pdf = pdf_(wo, wi, rec.Normal, rec.material); // 概率密度函数
-// 				Lo = (shading(r) * f_r * cosine / pdf) / P_RR;
-// 				break;
-// 			}
-// 			case 1: // 金属
-// 			{
-// 				break;
-// 			}
-				
-
-// 		}
-// 	}
-
-// 	return Lo;
-// }
-
-
-// =========================================================
-
-
-// =========================================================
-// vec3 shading(Ray r) {
-// 	vec3 Lo = vec3(1.0,1.0,1.0); // 出射辐射率
-// 	vec3 rayNext = vec3(0.0,0.0,0.0); // 下一条光线方向
-// 	vec3 f_r = vec3(0.0,0.0,0.0);
-// 	float cosine = 0.0;
-// 	float pdf = 0.0;
-// 	int flag = 1; // 标志位，用于控制光线追踪遇到自发光材质（光源）时的提前终止
-// 	int max_depth = 10; // 最大深度
-// 	for (int i = 0; i < max_depth; i++) {
-// 		if (IntersectBVH(r)) {
-// 			if (flag == 0) break;
-// 			switch(rec.material.transmission) {
-// 				case -1: // 光源
-// 					Lo *= rec.material.emissive;
-// 					flag = 0;
-// 					break;
-// 				case 0: // 漫反射
-// 					rayNext = diffuseReflection(rec.Normal);
-// 					f_r = rec.material.baseColor / PI;
-// 					// pdf = 0.5 / PI;
-// 					cosine = max(0.0, dot(rec.Normal, rayNext));
-// 					Lo *= (f_r * cosine);
-// 					break;
-// 				case 1: // 金属
-// 					rayNext = metalReflectionRough(r.direction, rec.Normal, rec.material.roughness);
-// 					Lo *= rec.material.baseColor;
-//                 break;
-//             }
-// 			r.direction = rayNext;
-// 			r.origin = rec.Pos;
-// 			r.hitMin = 100000;
-// 		}
-// 	}
-// 	return Lo;
-// }
-// =========================================================
-
-// =========================================================
-
-
-
 
 
 

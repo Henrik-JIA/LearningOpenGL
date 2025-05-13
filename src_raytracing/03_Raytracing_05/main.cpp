@@ -142,7 +142,7 @@ int main()
     red.baseColor = glm::vec3(0.63f, 0.065f, 0.05f);
 
     Material green;
-    red.transmission = 0.0f;
+    green.transmission = 0.0f;
     green.baseColor = glm::vec3(0.14f, 0.45f, 0.091f);
 
     Material white;
