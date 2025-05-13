@@ -139,9 +139,9 @@ int main()
 	Model dragon("../static/model/dragon/dragon.obj");
 	Model bunny("../static/model/bunny/bunny.obj");
 	Model box("../static/model/box/box.obj");
-	getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-0.7,-0.2,0.0));
-	getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 3.0, glm::vec3(0.0,-0.3,0.0));
-	getTexture(box.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.2, glm::vec3(0.7, 0.0, 0.0));
+	getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-0.0,-0.2,0.0));
+	// getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 3.0, glm::vec3(0.0,-0.3,0.0));
+	// getTexture(box.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.2, glm::vec3(0.7, 0.0, 0.0));
 
 	// 构建BVH树
 	bvhTree.BVHBuildTree(primitives);

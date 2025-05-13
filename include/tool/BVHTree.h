@@ -89,7 +89,7 @@ public:
 	int meshNumX, meshNumY;
 	float *MeshArray;
 
-	int maxPrimsInNode = 1;
+	int maxPrimsInNode = 1; // 控制叶子节点最大三角形数量的参数
 
 	BVHTree() {}
 
@@ -100,15 +100,20 @@ public:
 		meshNum = 0;
 	}
 
-	void BVHBuildTree(std::vector<std::shared_ptr<Triangle>> p, int stride = 24) {
-		primitives = std::move(p);
+	// 构建BVH树
+	void BVHBuildTree(std::vector<std::shared_ptr<Triangle>> p, int stride = 42) {
+		// 1. 数据准备阶段
+		primitives = std::move(p); // 转移三角形数据所有权
 		if (primitives.empty()) return;
+
 		// Initialize primitives
+		// 2. 创建基元信息数组（包含包围盒和质心）
 		std::vector<BVHPrimitiveInfo> primitiveInfo(primitives.size());
 		for (size_t i = 0; i < primitives.size(); ++i)
 			primitiveInfo[i] = { i, getTriangleBound(*primitives[i])};
 
 		// Build BVH tree
+		// 3. 递归构建BVH树
 		int totalNodes = 0;
 		std::vector<std::shared_ptr<Triangle>> orderedPrims;
 		orderedPrims.reserve(primitives.size());
@@ -116,25 +121,30 @@ public:
 		BVHNode *root;
 		root = recursiveBuild(primitiveInfo, 0, primitives.size(),
 			&totalNodes, orderedPrims);
-		primitives.swap(orderedPrims);
-		primitiveInfo.resize(0);
+		
+		// 4. 数据重组
+		primitives.swap(orderedPrims); // 用排序后的三角形替换原始数据
+		primitiveInfo.resize(0); // 释放临时内存
 
+		// 5. 展平BVH树为线性结构（便于GPU访问）
 		// Compute representation of depth-first traversal of BVH tree
 		nodeNum = totalNodes;
 		nodes = new LinearBVHNode[totalNodes];
 		int offset = 0;
 		flattenBVHTree(root, &offset);
 
+		// 6. 准备网格数据纹理
 		meshNum = primitives.size();
 		// int stride_t = 9 + 9 + 6 + 3 + 1;
 		// int stride_t = 9 + 9 + 6;
-		int stride_t = stride;
+		int stride_t = stride; // 每个三角形在纹理中的存储跨度
 		int meshNumSize = meshNum * stride_t;
 		float mesh_x_f = sqrtf(meshNumSize);
 		meshNumX = ceilf(mesh_x_f);
 		meshNumY = ceilf((float)meshNumSize / (float)meshNumX);
 		std::cout << "meshNumX = " << meshNumX << " meshNumY = " << meshNumY << std::endl;
 
+		// 7. 准备BVH节点数据纹理
 		MeshArray = new float[(meshNumX * meshNumY) * stride_t];
 		// 顶点赋值
 		for (int i = 0; i < meshNum; i++) {
@@ -209,11 +219,13 @@ public:
 			NodeArray[i * (9) + 8] = nodes[i].childOffset;
 		}
 
+		// 8. 清理临时节点数据
 		delete[] nodes;
 		nodes = nullptr;
 
 	}
 
+	// 递归构建BVH树
 	BVHNode *recursiveBuild(std::vector<BVHPrimitiveInfo> &primitiveInfo,
 							int start, int end, int *totalNodes,
 							std::vector<std::shared_ptr<Triangle>> &orderedPrims) 
@@ -227,7 +239,8 @@ public:
 
 		int nPrimitives = end - start;
 		
-		if (nPrimitives == 1) {
+		// 当前硬编码为1个三角形就停止划分
+		if (nPrimitives == maxPrimsInNode) {
 			// 构建叶节点
 			int firstPrimOffset = orderedPrims.size();
 			for (int i = start; i < end; ++i) {

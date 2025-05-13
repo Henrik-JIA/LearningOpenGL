@@ -233,7 +233,7 @@ bool IntersectBVH(Ray ray) {
 		rec.albedo = vec3(0.83, 0.73, 0.1); 
 		// rec.albedo = rec.Normal * 0.5 + 0.5; // 法线可视化
 		rec.rayHitMin = ray.hitMin;
-		rec.materialIndex = 0;
+		rec.materialIndex = 1;
 	}
 	return hit;
 }
@@ -340,7 +340,7 @@ vec3 metalReflection(vec3 rayIn, vec3 Normal) {
 
 vec3 shading(Ray r) {
 	vec3 color = vec3(1.0,1.0,1.0);
-	for (int i = 0; i < 50; i++) {
+	for (int i = 0; i < 100; i++) {
 		if (hitWorld(r)) {
 			
 			if(rec.materialIndex == 0)

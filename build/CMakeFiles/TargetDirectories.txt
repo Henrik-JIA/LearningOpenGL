@@ -1,0 +1,5 @@
+D:/CG/LearningOpenGL/build/CMakeFiles/main.dir
+D:/CG/LearningOpenGL/build/CMakeFiles/clean_all.dir
+D:/CG/LearningOpenGL/build/CMakeFiles/run.dir
+D:/CG/LearningOpenGL/build/CMakeFiles/edit_cache.dir
+D:/CG/LearningOpenGL/build/CMakeFiles/rebuild_cache.dir

@@ -1,1 +1,6 @@
-https://github.com/yumcyaWiz/glsl330-cornellbox
+参考资料
+[1] 着色器部分 https://github.com/AKGWSB/EzRT
+
+[2] 基本框架 https://github.com/feimos32/RayTracerBasedOnGLSL
+
+[3] 总代码 https://github.com/Azalea8/OpenGL_RayTracer
