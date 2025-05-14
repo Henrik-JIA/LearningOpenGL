@@ -132,6 +132,7 @@ int main()
 	// 生成屏幕FrameBuffer
 	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
 
+	// 光源的面积是13650
     Material light;
     light.transmission = -1.0f;
     light.emissive = 8.0f * glm::vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * glm::vec3 (0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f * glm::vec3(0.737f+0.642f,0.737f+0.159f,0.737f);
@@ -153,7 +154,6 @@ int main()
     white2.transmission = 1.0f;
     white2.roughness = 0.01f;
     white2.baseColor = glm::vec3(0.725f, 0.71f, 0.68f);
-
 	
 	// 加载数据纹理
 	// Model dragon("../static/model/dragon/dragon.obj");

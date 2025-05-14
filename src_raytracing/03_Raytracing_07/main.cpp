@@ -1,182 +1,447 @@
-#include <iostream>
-#include <memory>
-
 #include <glad/glad.h>
-//
 #include <GLFW/glfw3.h>
-//
+
 #include <glm/glm.hpp>
-//
-#include <tool/Gui.h>
-//
-#include "constant.h"
-#include "rectangle.h"
-#include "renderer.h"
-#include "shader.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
-std::unique_ptr<Renderer> renderer;
+#define STB_IMAGE_IMPLEMENTATION
+#include <tool/stb_image.h>
 
-void handleInput(GLFWwindow* window, const ImGuiIO& io) {
-  // Close Application
-  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-    glfwSetWindowShouldClose(window, GLFW_TRUE);
-  }
+#include <tool/Shader.h>
+#include <tool/Mesh.h>
+#include <tool/Model.h>
+#include <tool/RandomUtils.h> // 这个就对应Tool.h文件
+#include <tool/Camera.h> // 这个就是对应Camera.h文件
+#include <tool/TimeRecorder.h> // 这个就是对应Camera.h文件
+#include <tool/BVHTree.h>
+#include <tool/ObjectTexture.h>
+#include <tool/gui.h>
 
-  // Clear Render
-  if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
-    renderer->clear();
-  }
+#include <tool/RenderBuffer.h> // 这个就对应RT_Screen.h文件
+#include <geometry/RT_Screen_2D.h> // 这个就对应RT_Screen.h文件
+// #include <tool2/RT_Screen.h>
 
-  // Camera Movement
-  if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS &&
-      glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS) {
-    renderer->moveCamera(glm::vec3(0, 0, -io.MouseDelta.y));
-  } else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS &&
-             glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) ==
-                 GLFW_PRESS) {
-    renderer->moveCamera(glm::vec3(io.MouseDelta.x, io.MouseDelta.y, 0));
-  }
-  // Camera Orbit
-  else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS) {
-    const float orbitSpeed = 0.01f;
-    renderer->orbitCamera(orbitSpeed * io.MouseDelta.y,
-                          orbitSpeed * io.MouseDelta.x);
-  }
+
+#include <iostream>
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void processInput(GLFWwindow *window);
+// void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+// void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos); // 鼠标回调函数
+void mouse_button_calback(GLFWwindow *window, int button, int action, int mods); // 鼠标按钮回调函数
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset); // 滚轮回调函数
+
+unsigned int SCR_WIDTH = 1200;
+unsigned int SCR_HEIGHT = 800;
+
+// camera value
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.5f, 2.5f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+
+timeRecord tRecord;
+
+Camera cam(SCR_WIDTH, SCR_HEIGHT);
+
+RenderBuffer screenBuffer;
+
+BVHTree bvhTree;
+
+ObjectTexture ObjTex;
+
+std::vector<std::shared_ptr<Triangle>> primitives;
+
+// RayTracerShader 纹理序号：
+// 纹理0：Framebuffer
+// 纹理1：MeshVertex
+// 纹理2：MeshFaceIndex
+
+// ScreenShader 纹理序号：
+// 纹理0：Framebuffer
+
+int main()
+{
+	// GLFW初始化
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+#ifdef __APPLE__
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+
+	// 创建GLFW窗口
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+	if (window == NULL)
+	{
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+
+	// 交互事件
+	glfwMakeContextCurrent(window);
+	// glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	// glfwSetCursorPosCallback(window, mouse_callback);
+	// glfwSetScrollCallback(window, scroll_callback);
+	// 鼠标键盘事件
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback); // 注册窗口变化监听
+	glfwSetCursorPosCallback(window, mouse_callback); // 鼠标回调函数
+	glfwSetMouseButtonCallback(window, mouse_button_calback); // 鼠标按钮回调函数
+	glfwSetScrollCallback(window, scroll_callback); // 滚轮回调函数
+
+	// 窗口捕获鼠标，不显示鼠标
+	// glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	// -----------------------
+	// 创建imgui上下文
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO &io = ImGui::GetIO();
+	(void)io;
+	ImGui::StyleColorsDark(); // 设置样式
+	ImGui_ImplGlfw_InitForOpenGL(window, true); // 设置渲染平台
+	ImGui_ImplOpenGL3_Init("#version 330"); // 设置渲染器后端
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	// -----------------------
+
+
+	// 加载所有的OpenGL函数指针
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		return -1;
+	}
+
+	// CPU随机数初始化
+	CPURandomInit();
+
+	// 加载着色器
+	Shader RayTracerShader = Shader::FromFile("../src_raytracing/03_Raytracing_07/shader/RayTracerVertexShader.glsl", "../src_raytracing/03_Raytracing_07/shader/RayTracerFragmentShader.glsl");
+	Shader ScreenShader = Shader::FromFile("../src_raytracing/03_Raytracing_07/shader/ScreenVertexShader.glsl", "../src_raytracing/03_Raytracing_07/shader/ScreenFragmentShader.glsl");
+
+	// 绑定屏幕的坐标位置
+	RT_Screen screen;
+	screen.InitScreenBind();
+
+	// 生成屏幕FrameBuffer
+	screenBuffer.Init(SCR_WIDTH, SCR_HEIGHT);
+
+	// 光源的面积是13650
+    Material light;
+    light.transmission = -1.0f;
+    light.emissive = 8.0f * glm::vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * glm::vec3 (0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f * glm::vec3(0.737f+0.642f,0.737f+0.159f,0.737f);
+	light.baseColor = glm::vec3(1.0f, 1.0f, 1.0f);
+
+    Material red;
+    red.transmission = 0.0f;
+    red.baseColor = glm::vec3(0.63f, 0.065f, 0.05f);
+
+    Material green;
+    green.transmission = 0.0f;
+    green.baseColor = glm::vec3(0.14f, 0.45f, 0.091f);
+
+    Material white;
+    white.transmission = 0.0f;
+    white.baseColor = glm::vec3(0.725f, 0.71f, 0.68f);
+
+    Material white2;
+    white2.transmission = 1.0f;
+    white2.roughness = 0.01f;
+    white2.baseColor = glm::vec3(0.725f, 0.71f, 0.68f);
+	
+	// 加载数据纹理
+	// Model dragon("../static/model/dragon/dragon.obj");
+	// Model bunny("../static/model/bunny/bunny.obj");
+	// Model box("../static/model/box/box.obj");
+	// getTexture(dragon.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.04, glm::vec3(-0.7,-0.2,0.0));
+	// getTexture(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 3.0, glm::vec3(0.0,-0.3,0.0));
+	// getTexture(box.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 0.2, glm::vec3(0.7, 0.0, 0.0));
+
+	// 加载CornellBox
+	Model tallbox("../static/model/cornellbox/tallbox.obj");
+	getTextureWithTransform(tallbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							white); // 白色
+	Model shortbox("../static/model/cornellbox/shortbox.obj");
+	getTextureWithTransform(shortbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							white); // 白色
+	
+	Model floor("../static/model/cornellbox/floor.obj");
+	getTextureWithTransform(floor.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							white); // 白色
+	Model right("../static/model/cornellbox/right.obj");
+	getTextureWithTransform(right.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							green); // 绿色
+	Model left("../static/model/cornellbox/left.obj");
+	getTextureWithTransform(left.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							red); // 红色
+
+	Model areaLight("../static/model/cornellbox/light.obj");
+	glm::vec3 lightEmissive = 8.0f * glm::vec3(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * glm::vec3 (0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f * glm::vec3(0.737f+0.642f,0.737f+0.159f,0.737f);
+	getTextureWithTransform(areaLight.meshes, RayTracerShader, ObjTex, primitives, bvhTree,
+							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							light);
+	// 对光源位置进行变换，以获取变换后的三角形位置
+	glm::mat4 modelMatrix = glm::mat4(1.0f);
+    modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.0f, 0.0f));
+    modelMatrix = glm::scale(modelMatrix, glm::vec3(0.001f));
+    modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	// 存储变换后的光源三角形顶点
+	std::vector<glm::vec3> transformedLightVertices;
+	// 遍历模型的所有网格
+	for (auto& mesh : areaLight.meshes) {
+		// 遍历网格的所有顶点
+		for (auto& vertex : mesh.vertices) {
+			// 应用模型变换
+			glm::vec4 transformedPos = modelMatrix * glm::vec4(vertex.Position, 1.0f);
+			transformedLightVertices.push_back(glm::vec3(transformedPos));
+			std::cout << "transformedLightVertices" << "[" << transformedLightVertices.size() << "]" << " = " << transformedPos.x << ", " << transformedPos.y << ", " << transformedPos.z << std::endl;
+		}
+	}
+
+	// 构建BVH树
+	bvhTree.BVHBuildTree(primitives, 42);
+
+    generateTextures(ObjTex, bvhTree, RayTracerShader);
+
+	//测试BVH树
+	BVHTest(bvhTree, cam);
+	bvhTree.releaseAll();
+
+	// 渲染大循环
+	while (!glfwWindowShouldClose(window))
+	{
+		// 计算时间
+		tRecord.updateTime();
+
+		// 输入
+		processInput(window);
+
+		// 渲染循环加1
+		cam.LoopIncrease();
+
+		// 光线追踪渲染当前帧
+		{
+			// 绑定到当前帧缓冲区
+			screenBuffer.setCurrentBuffer(cam.LoopNum);
+
+			// screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的historyTexture为纹理0
+			RayTracerShader.setInt("historyTexture", 0);
+
+			// MeshTex赋值
+			ObjTex.setTex(RayTracerShader);
+
+			// 激活着色器
+			RayTracerShader.use();
+
+			// 相机参数赋值
+			RayTracerShader.setVec3("camera.camPos", cam.Position);
+			RayTracerShader.setVec3("camera.front", cam.Front);
+			RayTracerShader.setVec3("camera.right", cam.Right);
+			RayTracerShader.setVec3("camera.up", cam.Up);
+			RayTracerShader.setFloat("camera.halfH", cam.halfH);
+			RayTracerShader.setFloat("camera.halfW", cam.halfW);
+			RayTracerShader.setVec3("camera.leftbottom", cam.LeftBottomCorner);
+			RayTracerShader.setInt("camera.LoopNum", cam.LoopNum);
+
+			// 随机数初值赋值
+			RayTracerShader.setFloat("randOrigin", 874264.0f * (GetCPURandom() + 1.0f));
+
+			// 球物体赋值
+			RayTracerShader.setFloat("sphere[0].radius", 0.5);
+			RayTracerShader.setVec3("sphere[0].center", glm::vec3(0.0, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[0].materialIndex", 0);
+			RayTracerShader.setVec3("sphere[0].albedo", glm::vec3(0.8, 0.7, 0.2));
+
+			RayTracerShader.setFloat("sphere[1].radius", 0.5);
+			RayTracerShader.setVec3("sphere[1].center", glm::vec3(1.0, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[1].materialIndex", 1);
+			RayTracerShader.setVec3("sphere[1].albedo", glm::vec3(0.2, 0.7, 0.6));
+
+			RayTracerShader.setFloat("sphere[2].radius", 0.5);
+			RayTracerShader.setVec3("sphere[2].center", glm::vec3(-1.0, 0.0, -1.0));
+			RayTracerShader.setInt("sphere[2].materialIndex", 1);
+			RayTracerShader.setVec3("sphere[2].albedo", glm::vec3(0.1, 0.3, 0.7));
+
+			RayTracerShader.setFloat("sphere[3].radius", 0.5);
+			RayTracerShader.setVec3("sphere[3].center", glm::vec3(0.0, 0.0, 0.0));
+			RayTracerShader.setInt("sphere[3].materialIndex", 0);
+			RayTracerShader.setVec3("sphere[3].albedo", glm::vec3(0.9, 0.9, 0.9));
+			
+			// 光源三角形赋值
+			RayTracerShader.setVec3("triLight[0].p0", transformedLightVertices[0]);
+			RayTracerShader.setVec3("triLight[0].p1", transformedLightVertices[1]);
+			RayTracerShader.setVec3("triLight[0].p2", transformedLightVertices[2]);
+			RayTracerShader.setVec3("triLight[1].p0", transformedLightVertices[3]);
+			RayTracerShader.setVec3("triLight[1].p1", transformedLightVertices[4]);
+			RayTracerShader.setVec3("triLight[1].p2", transformedLightVertices[5]);
+
+			// 三角形赋值
+			// float floorHfW = 1.0, upBias = -0.22;
+			// RayTracerShader.setVec3("triFloor[0].v0", glm::vec3(-floorHfW, upBias, floorHfW));
+			// RayTracerShader.setVec3("triFloor[0].v1", glm::vec3(-floorHfW, upBias, -floorHfW));
+			// RayTracerShader.setVec3("triFloor[0].v2", glm::vec3(floorHfW, upBias, floorHfW));
+			
+			// RayTracerShader.setVec3("triFloor[1].v0", glm::vec3(floorHfW, upBias, floorHfW));
+			// RayTracerShader.setVec3("triFloor[1].v1", glm::vec3(-floorHfW, upBias, -floorHfW));
+			// RayTracerShader.setVec3("triFloor[1].v2", glm::vec3(floorHfW, upBias, -floorHfW));
+
+			// 渲染FrameBuffer
+			screen.DrawScreen();
+		}
+
+		// 渲染到默认Buffer上
+		{
+			// 绑定到默认缓冲区
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			// 清屏
+			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+
+			glClear(GL_COLOR_BUFFER_BIT);
+
+			ScreenShader.use();
+			screenBuffer.setCurrentAsTexture(cam.LoopNum);
+			// screenBuffer绑定的纹理被定义为纹理0，所以这里设置片段着色器中的screenTexture为纹理0
+			ScreenShader.setInt("screenTexture", 0);
+
+			// 绘制屏幕
+			screen.DrawScreen();
+		}
+
+		// 交换Buffer
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+	// 条件终止
+	glfwTerminate();
+
+	// 释放资源
+	screenBuffer.Delete();
+	screen.Delete();
+
+	return 0;
 }
 
-int main() {
-  // init glfw
-  if (!glfwInit()) {
-    std::cerr << "failed to initialize GLFW" << std::endl;
-  }
+// 按键处理
+void processInput(GLFWwindow *window) {
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
 
-  // set glfw error callback
-  glfwSetErrorCallback([]([[maybe_unused]] int error, const char* description) {
-    std::cerr << "Error: " << description << std::endl;
-    std::exit(EXIT_FAILURE);
-  });
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		cam.ProcessKeyboard(FORWARD, tRecord.deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		cam.ProcessKeyboard(BACKWARD, tRecord.deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		cam.ProcessKeyboard(LEFT, tRecord.deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		cam.ProcessKeyboard(RIGHT, tRecord.deltaTime);
+}
 
-  // setup window and context
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);  // Required on Mac
-  GLFWwindow* window =
-      glfwCreateWindow(1280, 720, "GLSL CornellBox", nullptr, nullptr);
-  if (!window) {
-    std::cerr << "failed to create window" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
-  glfwMakeContextCurrent(window);
+// 处理窗口尺寸变化
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+	SCR_WIDTH = width;
+	SCR_HEIGHT = height;
+	cam.updateScreenRatio(SCR_WIDTH, SCR_HEIGHT);
+	
+	glViewport(0, 0, width, height);
 
-  // disable v-sync
-  glfwSwapInterval(0);
+}
 
-  // initialize glad
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    std::cerr << "failed to initialize glad" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
+// // 鼠标事件响应
+// void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
+// 	float xpos = static_cast<float>(xposIn);
+// 	float ypos = static_cast<float>(yposIn);
+// 	cam.ProcessRotationByPosition(xpos, ypos);
+// }
 
-  // setup Dear ImGui context
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  (void)io;
+// // 设置fov
+// void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+// 	cam.updateFov(static_cast<float>(yoffset));
+// }
 
-  // setup Dear ImGui style
-  ImGui::StyleColorsDark();
+// 鼠标移动回调
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
 
-  // Setup Platform/Renderer backends
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 330 core");
-
-  // setup renderer
-  renderer = std::make_unique<Renderer>(512, 512);
-
-  // main app loop
-  while (!glfwWindowShouldClose(window)) {
-    glfwPollEvents();
-
-    // Start the Dear ImGui frame
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    ImGui::Begin("Renderer");
-    {
-      static int resolution[2] = {static_cast<int>(renderer->getWidth()),
-                                  static_cast<int>(renderer->getHeight())};
-      if (ImGui::InputInt2("Resolution", resolution)) {
-        renderer->resize(resolution[0], resolution[1]);
-      }
-
-      static RenderMode mode = renderer->getRenderMode();
-      if (ImGui::Combo("Layer", reinterpret_cast<int*>(&mode),
-                       "Render\0Normal\0Depth\0Albedo\0UV\0\0")) {
-        renderer->setRenderMode(mode);
-      }
-
-      static Integrator integrator = renderer->getIntegrator();
-      if (ImGui::Combo("Integrator", reinterpret_cast<int*>(&integrator),
-                       "PT\0PTNEE\0\0")) {
-        renderer->setIntegrator(integrator);
-      }
-
-      static SceneType scene_type = renderer->getSceneType();
-      if (ImGui::Combo("Scene", reinterpret_cast<int*>(&scene_type),
-                       "Original\0Sphere\0Indirect\0")) {
-        renderer->setSceneType(scene_type);
-      }
-
-      ImGui::Text("Samples: %d", renderer->getSamples());
-
-      glm::vec3 camPos = renderer->getCameraPosition();
-      ImGui::Text("Camera Position: (%.3f, %.3f, %.3f)", camPos.x, camPos.y,
-                  camPos.z);
-
-      static float fov = renderer->getCameraFOV() / PI * 180.0f;
-      if (ImGui::InputFloat("FOV", &fov)) {
-        renderer->setFOV(fov / 180.0f * PI);
-      }
-
-      ImGui::Text("FPS: %.1f", io.Framerate);
-
-      ImGui::Separator();
-
-      ImGui::Text("Camera Rotate: [MMB Drag]");
-      ImGui::Text("Camera Move: [LShift] + [MMB Drag]");
-      ImGui::Text("Camera Zoom: [LCtrl] + [MMB Drag]");
+    // 左键：视角旋转
+    if (cam.isRotating) {
+        cam.RotationSensitivity = 0.1f;
+        cam.ProcessRotationByPosition(xpos, ypos);  // 直接传入当前坐标
+        cameraPos = cam.Position;
+        cameraFront = cam.Front;
     }
-    ImGui::End();
-
-    // Handle Input
-    handleInput(window, io);
-
-    // Rendering
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    renderer->render();
-
-    // ImGui Rendering
-    int display_w, display_h;
-    glfwGetFramebufferSize(window, &display_w, &display_h);
-    glViewport(0, 0, display_w, display_h);
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    glfwSwapBuffers(window);
-  }
-
-  // exit
-  ImGui_ImplOpenGL3_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
-  ImGui::DestroyContext();
-
-  renderer->destroy();
-
-  glfwDestroyWindow(window);
-  glfwTerminate();
-
-  return 0;
+    // 右键：视角平移
+    else if (cam.isPanning) {      
+        cam.PanSensitivity = 0.003f;
+        cam.ProcessPanByPosition(xpos, ypos);
+        cameraPos = cam.Position;
+    }
+    // 更新初始位置
+    else {
+        cam.lastX = xpos;
+        cam.lastY = ypos;
+    }
 }
+
+// 鼠标按键回调
+void mouse_button_calback(GLFWwindow *window, int button, int action, int mods)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
+
+  // 左键处理
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+      if (action == GLFW_PRESS) {
+          cam.isRotating = true;
+          glfwGetCursorPos(window, &cam.lastX, &cam.lastY);
+      } else if (action == GLFW_RELEASE) {
+          cam.isRotating = false;
+      }
+  }
+  // 右键处理
+  else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+      if (action == GLFW_PRESS) {
+          cam.isPanning = true;
+          glfwGetCursorPos(window, &cam.lastX, &cam.lastY);
+      } else if (action == GLFW_RELEASE) {
+          cam.isPanning = false;
+      }
+  }
+}
+
+// 滚轮回调
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;  // 新增：当ImGui使用鼠标时跳过场景处理
+
+    const float baseSpeed = 0.005f;
+    const float shiftMultiplier = 1.5f; // 按住Shift加速
+    
+    float actualSpeed = baseSpeed;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        actualSpeed *= shiftMultiplier;
+		cam.ScrollSensitivity = actualSpeed;
+    }
+
+    cam.ProcessScrollFromMovement(yoffset > 0, tRecord.deltaTime);
+	
+}
+
+
+
+
+

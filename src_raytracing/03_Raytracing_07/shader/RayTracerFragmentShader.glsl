@@ -78,6 +78,7 @@ struct Triangle {
 	vec2 u0, u1, u2;
 	Material material;
 };
+uniform Triangle triLight[2];
 
 uniform sampler2D texMesh;
 uniform int meshNum;
@@ -91,28 +92,17 @@ struct hitRecord {
 	vec3 Pos;
 	vec3 Normal;
 	vec3 viewDir;
+	int triangleIndex;
+	float triangleArea;
 	Material material; 
 };
 hitRecord rec;
-
-struct HitResult {
-	bool isHit;             // 是否命中
-	bool isInside;          // 是否从内部命中
-	float distance;         // 与交点的距离
-	vec3 hitPoint;          // 光线命中点
-	vec3 normal;            // 命中点法线
-	vec3 viewDir;           // 击中该点的光线的方向
-	Material material;      // 命中点的表面材质
-};
-
 
 float At(sampler2D dataTex, float index);
 // 返回值：ray到球交点的距离
 float hitSphere(Sphere s, Ray r);
 float hitTriangle(Triangle tri, Ray r);
-// HitResult hitWorld(Ray r); // 修改为返回HitResult
 bool hitWorld(Ray r);
-// vec3 shade(HitResult hit_obj, vec3 wo); 
 vec3 shading(Ray r);
 vec3 getTriangleNormal(Triangle tri);
 Triangle getTriangle(int index);
@@ -137,13 +127,23 @@ void main() {
 	// 获取历史帧信息
 	vec3 hist = texture(historyTexture, TexCoords).rgb;
 
+	// 添加亚像素随机偏移
+    vec2 jitter = vec2(rand(), rand()) - 0.5; // [-0.5, 0.5]范围随机偏移
+    float jitterScale = 0.5; // 控制扰动强度，可根据需要调整
+    // 计算扰动后的UV坐标
+	vec2 texSize = textureSize(historyTexture, 0); // 获取二维纹理的尺寸
+    vec2 sampleUV = TexCoords + jitter * (1.0 / texSize) * jitterScale;
+    
 	Ray cameraRay;
 	cameraRay.origin = camera.camPos;
-	cameraRay.direction = normalize(camera.leftbottom + (TexCoords.x * 2.0 * camera.halfW) * camera.right + (TexCoords.y * 2.0 * camera.halfH) * camera.up);
+	cameraRay.direction = normalize(
+			camera.leftbottom 
+			+ (sampleUV.x * 2.0 * camera.halfW) * camera.right 
+			+ (sampleUV.y * 2.0 * camera.halfH) * camera.up);
 	cameraRay.hitMin = 100000.0;
 
 	vec3 curColor = vec3(0.0, 0.0, 0.0);
-	int N = 3;
+	int N = 5;
 	for (int i = 0; i < N; i++) 
 	{
 		if(IntersectBVH(cameraRay)) {
@@ -372,6 +372,13 @@ LinearBVHNode getLinearBVHNode(int nodeIndex) {
     return node;
 }
 
+// 计算三角形面积
+float getTriangleArea(Triangle tri) {
+    vec3 edge1 = tri.p1 - tri.p0;
+    vec3 edge2 = tri.p2 - tri.p0;
+    return 0.5 * length(cross(edge1, edge2));
+}
+
 bool IntersectBVH(Ray ray) {
 	// if (!bvhTree.nodes) return false;
 	bool hit = false;
@@ -392,6 +399,7 @@ bool IntersectBVH(Ray ray) {
 	int nodesToVisit[64]; // 访问节点栈，最多64个
 
 	Triangle tri; // 初始化三角形
+	int offset = 0;
 	while (true) {
 		// 获取当前BVH节点
 		LinearBVHNode node = getLinearBVHNode(currentNodeIndex);
@@ -407,7 +415,7 @@ bool IntersectBVH(Ray ray) {
 			if (node.nPrimitives > 0) {
 				// 遍历当前节点的所有三角形
 				for (int i = 0; i < node.nPrimitives; ++i) {
-					int offset = (node.childOffset + i); // 计算三角形在数据存储中的索引位置
+					offset = (node.childOffset + i); // 计算三角形在数据存储中的索引位置
 					Triangle tri_t = getTriangle(offset); // 根据索引获取三角形数据
 					float dis_t = hitTriangle(tri_t, ray); // 计算光线与三角形交点距离
 					// 如果交点距离大于0且小于当前最小距离
@@ -453,6 +461,8 @@ bool IntersectBVH(Ray ray) {
 		// 下面注释的glsl代码可以解决面法向量始终超外，但会影响帧率
 		rec.Normal = (dot(rawNormal, -ray.direction) > 0.0) ? rawNormal : -rawNormal;
 		rec.viewDir = -ray.direction;
+		rec.triangleIndex = offset;
+		rec.triangleArea = getTriangleArea(tri);
 		// rec.albedo = vec3(0.83, 0.73, 0.1); 
 		// rec.albedo = rec.Normal * 0.5 + 0.5; // 法线可视化
 		rec.material = tri.material; 
@@ -460,15 +470,6 @@ bool IntersectBVH(Ray ray) {
 		// rec.materialIndex = tri.materialType;
 	}
 	return hit;
-}
-
-// =========================================================
-
-// 计算三角形面积
-float getTriangleArea(Triangle tri) {
-    vec3 edge1 = tri.p1 - tri.p0;
-    vec3 edge2 = tri.p2 - tri.p0;
-    return 0.5 * length(cross(edge1, edge2));
 }
 
 // =========================================================
@@ -750,98 +751,307 @@ vec3 eval_(vec3 wi, vec3 wo, vec3 N, Material material) {
 
 // =========================================================
 
-vec3 shading(Ray r) {
-    vec3 throughput = vec3(1.0);
-    vec3 Lo = vec3(0.0);
-	int flag = 1;
-    float P_RR = 0.8;
+// vec3 shading(Ray r) {
+//     vec3 throughput = vec3(1.0);
+//     vec3 Lo = vec3(0.0);
+// 	int flag = 1;
+//     float P_RR = 0.8;
 
-    for(int depth=0; depth<60; depth++) {
-		if (flag == 0) break;
+//     for(int depth=0; depth<60; depth++) {
+// 		if (flag == 0) break;
 
-		// 俄罗斯轮盘赌判断
-        if (depth > 3 && rand() > P_RR) break;
+// 		// 俄罗斯轮盘赌判断
+//         if (depth > 3 && rand() > P_RR) break;
 
-        // 根据命中点材质类型处理光照
-        switch(int(rec.material.transmission)) {
-            case -1: // 光源材质
-            {   
-				Lo = throughput * (rec.material.emissive * 0.3);
-				flag = 0;
-                break;
-			}
-            case 0: // 漫反射材质
-            {
-				vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
-				float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
-				// vec3 f_r = rec.material.baseColor / PI; // 漫反射系数
-				vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
-				float cosine = max(0.0, dot(dir_next, rec.Normal));
-				if (pdf > EPSILON) 
-				{
-					Ray rayNext;
-					rayNext.origin = rec.Pos + rec.Normal * 0.001;
-					rayNext.direction = dir_next;
-					rayNext.hitMin = 100000;
-					bool hitNext = IntersectBVH(rayNext);
-					if (hitNext) 
-					{
-						throughput = throughput * (f_r * cosine) / pdf / P_RR;
-					}
-					else
-					{
-						throughput = vec3(0.0);
-						flag = 0;
-						break;
-					}
-				}
-				else
-				{
-					throughput = vec3(0.0);
-					flag = 0;
-					break;
-				}
-                break;
-            }
-			case 1: // 金属
-			{
-				vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
-				float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
-				// vec3 f_r = rec.material.baseColor / PI; // 漫反射系数
-				vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
-				float cosine = max(0.0, dot(dir_next, rec.Normal));
-				if (pdf > EPSILON) 
-				{
-					Ray rayNext;
-					rayNext.origin = rec.Pos + rec.Normal * 0.001;
-					rayNext.direction = dir_next;
-					rayNext.hitMin = 100000;
-					bool hitNext = IntersectBVH(rayNext);
-					if (hitNext) 
-					{
-						throughput = throughput * (f_r * cosine) / pdf / P_RR;
-					}
-					else
-					{
-						throughput = vec3(0.0);
-						flag = 0;
-						break;
-					}
-				}
-				else
-				{
-					throughput = vec3(0.0);
-					flag = 0;
-					break;
-				}
-                break;
-			}
-        }
-    }
-    return Lo;
-}
+//         // 根据命中点材质类型处理光照
+//         switch(int(rec.material.transmission)) {
+//             case -1: // 光源材质
+//             {   
+// 				Lo = throughput * (rec.material.emissive * 0.3);
+// 				flag = 0;
+//                 break;
+// 			}
+//             case 0: // 漫反射材质
+//             {
+// 				vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
+// 				float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
+// 				// vec3 f_r = rec.material.baseColor / PI; // 漫反射系数
+// 				vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+// 				float cosine = max(0.0, dot(dir_next, rec.Normal));
+// 				if (pdf > EPSILON) 
+// 				{
+// 					Ray rayNext;
+// 					rayNext.origin = rec.Pos + rec.Normal * 0.001;
+// 					rayNext.direction = dir_next;
+// 					rayNext.hitMin = 100000;
+// 					bool hitNext = IntersectBVH(rayNext);
+// 					if (hitNext) 
+// 					{
+// 						throughput = throughput * (f_r * cosine) / pdf / P_RR;
+// 					}
+// 					else
+// 					{
+// 						throughput = vec3(0.0);
+// 						flag = 0;
+// 						break;
+// 					}
+// 				}
+// 				else
+// 				{
+// 					throughput = vec3(0.0);
+// 					flag = 0;
+// 					break;
+// 				}
+//                 break;
+//             }
+// 			case 1: // 金属
+// 			{
+// 				vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
+// 				float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
+// 				// vec3 f_r = rec.material.baseColor / PI; // 漫反射系数
+// 				vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+// 				float cosine = max(0.0, dot(dir_next, rec.Normal));
+// 				if (pdf > EPSILON) 
+// 				{
+// 					Ray rayNext;
+// 					rayNext.origin = rec.Pos + rec.Normal * 0.001;
+// 					rayNext.direction = dir_next;
+// 					rayNext.hitMin = 100000;
+// 					bool hitNext = IntersectBVH(rayNext);
+// 					if (hitNext) 
+// 					{
+// 						throughput = throughput * (f_r * cosine) / pdf / P_RR;
+// 					}
+// 					else
+// 					{
+// 						throughput = vec3(0.0);
+// 						flag = 0;
+// 						break;
+// 					}
+// 				}
+// 				else
+// 				{
+// 					throughput = vec3(0.0);
+// 					flag = 0;
+// 					break;
+// 				}
+//                 break;
+// 			}
+//         }
+//     }
+//     return Lo;
+// }
+
 // =========================================================
 
+vec3 shading(Ray r)
+{
+	vec3 L_dir = vec3(0.0);
+	vec3 L_indir = vec3(0.0);
+	vec3 throughput = vec3(1.0);
+	float P_RR = 0.8;
+	int flag = 1;
+	Ray rayNext;
+	// // 第一次命中记录
+	// hitRecord currentRec = rec;
+
+	// ========== 直接光照部分 ==========
+	if(rec.isHit && rec.material.transmission != -1)
+	{
+		// 随机选择一个光源三角形
+		int lightTriCount = 2;
+		int lightIndex = int(rand() * lightTriCount);
+		if(lightIndex >= lightTriCount)
+		{
+			lightIndex = lightTriCount - 1; // 防止越界
+		}
+		Triangle lightTri = triLight[lightIndex];
+
+		// 计算光源三角形的法向量
+		vec3 e1 = lightTri.p1 - lightTri.p0;
+		vec3 e2 = lightTri.p2 - lightTri.p0;
+		vec3 lightNormal = normalize(cross(e1, e2));
+
+		// 计算光源三角形的总面积	
+		float lightArea = getTriangleArea(lightTri);
+        float totalLightArea = lightArea * lightTriCount; // 总发光面积
+
+		// 在三角形表面均匀采样
+		float u = rand();
+		float v = rand() * (1.0 - u);
+		vec3 lightPoint = lightTri.p0 
+			+ u * (lightTri.p1 - lightTri.p0)
+			+ v * (lightTri.p2 - lightTri.p0);
+
+		// 准备阴影射线
+		vec3 wi = normalize(rec.Pos - lightPoint);
+		float dist = length(rec.Pos - lightPoint);
+		Ray shadowRay;
+		shadowRay.origin = lightPoint + rec.Normal * 0.001;
+		shadowRay.direction = wi;
+		shadowRay.hitMin = 100000;
+
+		// 可见性检测
+		bool hitShadow = IntersectBVH(shadowRay);
+		if(hitShadow && rec.rayHitMin == dist)
+		{
+			float cosTheta = max(dot(rec.Normal, -wi), 0.0); // 入射角
+			float cosThetaPrime = max(dot(lightNormal, wi), 0.0); // 光源与法线夹角 
+			float pdf_light = 1.0 / totalLightArea;
+
+			vec3 f_r = eval_(-wi, -r.direction, rec.Normal, rec.material);
+			vec3 L_i = 8.0 * vec3(0.747+0.058, 0.747+0.258, 0.747) 
+					+ 15.6 * vec3 (0.740+0.287,0.740+0.160,0.740) 
+					+ 18.4 * vec3(0.737+0.642,0.737+0.159,0.737);
+
+			L_dir = throughput * L_i * f_r * cosTheta * cosThetaPrime 
+              / (dist * dist) / pdf_light;
+		}
+	}
+
+	bool hit = IntersectBVH(r);
+	// ========== 间接光照部分 ==========
+    // for(int depth = 0; depth < 10; depth++) {
+    //     // 俄罗斯轮盘赌终止
+    //     if(depth > 3 && rand() > P_RR) break;
+
+    //     // 1. 采样间接光照方向
+    //     vec3 wi = sample_(rec.viewDir, rec.Normal, rec.material);
+    //     float pdf = pdf_(rec.viewDir, wi, rec.Normal, rec.material);
+    //     float cosTheta = max(dot(rec.Normal, wi), 0.0);
+        
+    //     if(pdf < EPSILON) break;
+
+    //     // 2. 更新吞吐量
+    //     vec3 f_r = eval_(wi, rec.viewDir, rec.Normal, rec.material);
+    //     throughput *= f_r * cosTheta / pdf / P_RR;
+
+    //     // 3. 发射新射线
+    //     Ray nextRay;
+    //     nextRay.origin = rec.Pos + rec.Normal * 0.001;
+    //     nextRay.direction = wi;
+    //     nextRay.hitMin = 100000;
+
+    //     // 4. 检测下一次命中
+    //     if(IntersectBVH(nextRay)) {
+    //         if(rec.material.transmission == -1) { // 击中光源
+    //             L_indir += throughput * rec.material.emissive * 0.3;
+    //             break;
+    //         }
+    //     } else {
+    //         break; // 击中天空盒
+    //     }
+    // }
+
+	
+	for(int depth=0; depth<60; depth++){
+		if(flag == 0) break;
+
+		// 间接光照
+		if(depth > 3 && rand() > P_RR) break;
+
+		vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
+		vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+		float cosine = max(0.0, dot(dir_next, rec.Normal));
+		float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
+		
+		if(rec.material.transmission == -1)
+		{
+			L_indir = throughput * (rec.material.emissive * 0.155);
+			flag = 0;
+			break;
+		}
+		else
+		{
+			throughput = throughput * (f_r * cosine) / pdf / P_RR;
+		}
+
+		rayNext.origin = rec.Pos + rec.Normal * 0.001;
+		rayNext.direction = dir_next;
+		rayNext.hitMin = 100000;
+
+		bool hitNext = IntersectBVH(rayNext);
+		if(!hitNext)
+		{
+			flag = 0;
+			break;
+		}
+	}
+    
+    return L_dir + L_indir;
+
+	
+}
+
+// =========================================================
+// vec3 shading(Ray r) {
+// 	vec3 throughput = vec3(1.0);
+// 	vec3 L_dir = vec3(0.0);
+// 	vec3 L_indir = vec3(0.0);
+// 	int flag = 1;
+// 	float P_RR = 0.8;
+// 	Ray rayNext;
+	
+// 	if(rec.isHit && rec.material.transmission != -1)
+// 	{
+// 		vec3 shade_point = rec.Pos;
+// 		vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);	
+// 		float cosTheta = max(0.0, dot(rec.Normal, dir_next));
+
+// 		rayNext.origin = rec.Pos + rec.Normal * 0.001;
+// 		rayNext.direction = dir_next;
+// 		rayNext.hitMin = 100000;
+
+// 		bool hitNext = IntersectBVH(rayNext);
+// 		if(hitNext && rec.material.transmission == -1)
+// 		{
+// 			vec3 light_point = rec.Pos;
+// 			Triangle lightTri = getTriangle(rec.triangleIndex);
+// 			float pdf_light = 1.0 / (2 * rec.triangleArea);
+// 			float cosThetaPrime = max(0.0, dot(rec.Normal, -dir_next));
+// 			float distance = length(light_point - shade_point);
+// 			float factor = (cosTheta * cosThetaPrime) / (distance * distance);
+// 			L_dir = throughput * ((rec.material.emissive * 0.3) * factor) / pdf_light;
+// 		}
+// 	}
+
+
+// 	for(int depth=0; depth<60; depth++){
+// 		if(flag == 0) break;
+
+// 		// 间接光照
+// 		if(depth > 3 && rand() > P_RR) break;
+
+// 		vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
+// 		vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+// 		float cosine = max(0.0, dot(dir_next, rec.Normal));
+// 		float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
+		
+// 		if(rec.material.transmission == -1)
+// 		{
+// 			L_indir = throughput * (rec.material.emissive * 0.3);
+// 			flag = 0;
+// 			break;
+// 		}
+// 		else
+// 		{
+// 			throughput = throughput * (f_r * cosine) / pdf / P_RR;
+// 		}
+
+// 		rayNext.origin = rec.Pos + rec.Normal * 0.001;
+// 		rayNext.direction = dir_next;
+// 		rayNext.hitMin = 100000;
+
+// 		bool hitNext = IntersectBVH(rayNext);
+// 		if(!hitNext)
+// 		{
+// 			flag = 0;
+// 			break;
+// 		}
+// 	}
+
+// 	return L_dir + L_indir;
+// }
 
 
 
