@@ -149,9 +149,9 @@ void main() {
 		if(IntersectBVH(cameraRay)) {
 			curColor += shading(cameraRay);
 		}else{
-			// float t = 0.5 * (cameraRay.direction.y + 1.0);
-			// vec3 bgColor = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-			vec3 bgColor = vec3(0.0, 0.0, 0.0);
+			float t = 0.5 * (cameraRay.direction.y + 1.0);
+			vec3 bgColor = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+			// vec3 bgColor = vec3(0.0, 0.0, 0.0);
 			curColor += bgColor;
 		}
 	}
@@ -861,20 +861,13 @@ vec3 shading(Ray r)
 		// 随机选择一个光源三角形
 		int lightTriCount = 2;
 		int lightIndex = int(rand() * lightTriCount);
-		if(lightIndex >= lightTriCount)
-		{
-			lightIndex = lightTriCount - 1; // 防止越界
-		}
+		lightIndex = clamp(lightIndex, 0, lightTriCount-1);
 		Triangle lightTri = triLight[lightIndex];
 
 		// 计算光源三角形的法向量
 		vec3 e1 = lightTri.p1 - lightTri.p0;
 		vec3 e2 = lightTri.p2 - lightTri.p0;
 		vec3 lightNormal = normalize(cross(e1, e2));
-
-		// 计算光源三角形的总面积	
-		float lightArea = getTriangleArea(lightTri);
-        float totalLightArea = lightArea * lightTriCount; // 总发光面积
 
 		// 在三角形表面均匀采样
 		float u = rand();
@@ -884,28 +877,31 @@ vec3 shading(Ray r)
 			+ v * (lightTri.p2 - lightTri.p0);
 
 		// 准备阴影射线
-		vec3 wi = normalize(rec.Pos - lightPoint);
 		float dist = length(rec.Pos - lightPoint);
 		Ray shadowRay;
-		shadowRay.origin = lightPoint + rec.Normal * 0.001;
-		shadowRay.direction = wi;
+		shadowRay.origin = lightPoint + lightNormal * 0.001;
+		shadowRay.direction = normalize(rec.Pos - lightPoint);
 		shadowRay.hitMin = 100000;
 
 		// 可见性检测
 		bool hitShadow = IntersectBVH(shadowRay);
-		if(hitShadow && rec.rayHitMin == dist)
+		if(abs(rec.rayHitMin - dist) < 0.01)
 		{
-			float cosTheta = max(dot(rec.Normal, -wi), 0.0); // 入射角
-			float cosThetaPrime = max(dot(lightNormal, wi), 0.0); // 光源与法线夹角 
-			float pdf_light = 1.0 / totalLightArea;
+			float cosTheta = max(dot(rec.Normal, -shadowRay.direction), 0.0); // 入射角
+			float cosThetaPrime = max(dot(lightNormal, shadowRay.direction), 0.0); // 光源与法线夹角 
+			float lightArea = ((getTriangleArea(lightTri) * lightTriCount));
+			float pdf_light = 1.0 / lightArea;
 
-			vec3 f_r = eval_(-wi, -r.direction, rec.Normal, rec.material);
+			vec3 f_r = eval_(-shadowRay.direction, -r.direction, rec.Normal, rec.material);
 			vec3 L_i = 8.0 * vec3(0.747+0.058, 0.747+0.258, 0.747) 
 					+ 15.6 * vec3 (0.740+0.287,0.740+0.160,0.740) 
 					+ 18.4 * vec3(0.737+0.642,0.737+0.159,0.737);
+			
+			float geometry_term = cosTheta * cosThetaPrime / (dist * dist);
 
-			L_dir = throughput * L_i * f_r * cosTheta * cosThetaPrime 
-              / (dist * dist) / pdf_light;
+			// L_dir = throughput * L_i * f_r * cosTheta * cosThetaPrime 
+            //   / (dist * dist) / pdf_light;
+			L_dir = throughput * L_i * f_r * geometry_term / pdf_light;
 		}
 	}
 
@@ -943,40 +939,40 @@ vec3 shading(Ray r)
     //     }
     // }
 
-	
-	for(int depth=0; depth<60; depth++){
-		if(flag == 0) break;
+	// =========================================================
+	// for(int depth=0; depth<60; depth++){
+	// 	if(flag == 0) break;
 
-		// 间接光照
-		if(depth > 3 && rand() > P_RR) break;
+	// 	// 间接光照
+	// 	if(depth > 3 && rand() > P_RR) break;
 
-		vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
-		vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
-		float cosine = max(0.0, dot(dir_next, rec.Normal));
-		float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
+	// 	vec3 dir_next = sample_(rec.viewDir, rec.Normal, rec.material);
+	// 	vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+	// 	float cosine = max(0.0, dot(dir_next, rec.Normal));
+	// 	float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
 		
-		if(rec.material.transmission == -1)
-		{
-			L_indir = throughput * (rec.material.emissive * 0.155);
-			flag = 0;
-			break;
-		}
-		else
-		{
-			throughput = throughput * (f_r * cosine) / pdf / P_RR;
-		}
+	// 	if(rec.material.transmission == -1)
+	// 	{
+	// 		L_indir = throughput * (rec.material.emissive * 0.155);
+	// 		flag = 0;
+	// 		break;
+	// 	}
+	// 	else
+	// 	{
+	// 		throughput = throughput * (f_r * cosine) / pdf / P_RR;
+	// 	}
 
-		rayNext.origin = rec.Pos + rec.Normal * 0.001;
-		rayNext.direction = dir_next;
-		rayNext.hitMin = 100000;
+	// 	rayNext.origin = rec.Pos + rec.Normal * 0.001;
+	// 	rayNext.direction = dir_next;
+	// 	rayNext.hitMin = 100000;
 
-		bool hitNext = IntersectBVH(rayNext);
-		if(!hitNext)
-		{
-			flag = 0;
-			break;
-		}
-	}
+	// 	bool hitNext = IntersectBVH(rayNext);
+	// 	if(!hitNext)
+	// 	{
+	// 		flag = 0;
+	// 		break;
+	// 	}
+	// }
     
     return L_dir + L_indir;
 
