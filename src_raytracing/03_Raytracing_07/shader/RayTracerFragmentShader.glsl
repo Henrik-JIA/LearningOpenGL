@@ -31,6 +31,11 @@ struct sampleDir {
     vec3 refractDir; // 折射方向
 };
 
+struct BRDFResult {
+    vec3 fr_reflect; // 反射分量
+    vec3 fr_refract; // 折射分量
+};
+
 struct Ray {
 	vec3 origin;
 	vec3 direction;
@@ -492,10 +497,18 @@ vec3 toWorld(vec3 v, vec3 N) {
  * 计算反射方向
  * @param I 入射方向 (从表面指向光源/相机的方向，需归一化)
  * @param N 表面法线 (需归一化，指向表面外侧)
+ * @param roughness 粗糙度
  * @return 反射方向向量 (已归一化)
  */
-vec3 calculateReflect(vec3 I, vec3 N) {
-    return I - 2.0 * dot(I, N) * N;
+vec3 calculateReflect(vec3 I, vec3 N, float roughness) {
+    vec3 baseReflect = I - 2.0 * dot(I, N) * N;
+    
+    // 添加粗糙度扰动
+    if(roughness > 0.0) {
+        vec3 perturb = roughness * random_in_unit_hemisphere(N);
+        return normalize(baseReflect + perturb);
+    }
+    return normalize(baseReflect);
 }
 
 /**
@@ -535,7 +548,7 @@ sampleDir sample_(vec3 wo, vec3 N, Material material){
 	result.refractDir = vec3(0.0, 0.0, 0.0);
 	
 	switch(material.transmission) {
-		case 0: {
+		case 0: { // 漫反射材质
 			// 余弦加权半球采样
 			float r0 = rand();
 			float r1 = rand();
@@ -553,43 +566,56 @@ sampleDir sample_(vec3 wo, vec3 N, Material material){
 			result.reflectDir = toWorld(localRay, N);
 			break;
 		}
-		case 1: {
-			vec3 reflectDir = calculateReflect(-wo, N); // 使用标准反射函数
-			// 添加粗糙度扰动
-			vec3 perturb = material.roughness * random_in_unit_hemisphere(N);
-			result.reflectDir = normalize(reflectDir + perturb);			
+		case 1: { // 镜面反射材质
+			result.reflectDir = calculateReflect(-wo, N, material.roughness);			
 			break;
 		}
-		case 2:{
-			// 折射材质采样
+		case 2: { // 折射材质
+			// // 折射材质采样
+			// vec3 V = normalize(-wo);
+			// float cosTheta = dot(N, V);
+			// float eta = (cosTheta > 0.0) ? (1.0 / material.IOR) : material.IOR;
+			
+			// // 使用GGX采样微表面法线
+			// float r0 = rand();
+			// float r1 = rand();
+			// float a = material.roughness;
+			// float a2 = a * a;
+			// float phi = 2.0 * PI * r1;
+			// float cosThetaH = sqrt((1.0 - r0) / (r0 * (a2 - 1.0) + 1.0));
+			// float sinThetaH = sqrt(1.0 - cosThetaH * cosThetaH);
+			
+			// vec3 localH = vec3(
+			// 	sinThetaH * cos(phi),
+			// 	sinThetaH * sin(phi),
+			// 	cosThetaH
+			// );
+			// vec3 H = toWorld(localH, N);
+			
+			// // 计算折射方向（核心修改点）
+			// result.refractDir = refract(-V, H, eta);
+			
+			// // 处理全内反射
+			// if(length(result.refractDir) < EPSILON) {
+			// 	result.reflectDir = reflect(-V, H); // 退化为反射
+			// }
+			// break;
+
 			vec3 V = normalize(-wo);
 			float cosTheta = dot(N, V);
 			float eta = (cosTheta > 0.0) ? (1.0 / material.IOR) : material.IOR;
 			
-			// 使用GGX采样微表面法线
-			float r0 = rand();
-			float r1 = rand();
-			float a = material.roughness;
-			float a2 = a * a;
-			float phi = 2.0 * PI * r1;
-			float cosThetaH = sqrt((1.0 - r0) / (r0 * (a2 - 1.0) + 1.0));
-			float sinThetaH = sqrt(1.0 - cosThetaH * cosThetaH);
-			
-			vec3 localH = vec3(
-				sinThetaH * cos(phi),
-				sinThetaH * sin(phi),
-				cosThetaH
-			);
-			vec3 H = toWorld(localH, N);
-			
-			// 计算折射方向（核心修改点）
-			result.refractDir = refract(-V, H, eta);
+			// 分别计算反射和折射方向
+			result.reflectDir = calculateReflect(V, N, material.roughness);
+			result.refractDir = calculateRefract(V, N, eta);
 			
 			// 处理全内反射
 			if(length(result.refractDir) < EPSILON) {
-				result.reflectDir = reflect(-V, H); // 退化为反射
+				result.reflectDir = calculateReflect(V, N, material.roughness);
+				result.refractDir = vec3(0.0);
 			}
 			break;
+
 		}
 	}
 	return result;
@@ -733,16 +759,18 @@ float fresnel(vec3 I, vec3 N, float ior) {
 //   N  - 法线
 //   material - 材质
 // 返回值：BRDF值
-vec3 eval_(vec3 wi, vec3 wo, vec3 N, Material material) {
-	vec3 f_r;
+BRDFResult eval_(vec3 wi, vec3 wo, vec3 N, Material material) {
+	BRDFResult f_r;
+	f_r.fr_reflect = vec3(0.0f);
+	f_r.fr_refract = vec3(0.0f);
 	switch(material.transmission) {
 		case 0:{
 			// 漫反射材料
 			float cosalpha = dot(N, wo);
 			if(cosalpha > EPSILON) {
-				f_r = material.baseColor / PI;
+				f_r.fr_reflect = material.baseColor / PI;
 			}else {
-				f_r = vec3(0.0f);
+				f_r.fr_reflect = vec3(0.0f);
 			}
 			break;
 		}
@@ -786,29 +814,73 @@ vec3 eval_(vec3 wi, vec3 wo, vec3 N, Material material) {
 
 				// 金属材质漫反射衰减
 				vec3 kD = (vec3(1.0) - F) * (1.0 - material.metallic);
-				f_r = kD * material.baseColor / PI + specular;
+				f_r.fr_reflect = kD * material.baseColor / PI + specular;
 			} else {
-				f_r = vec3(0.0);
+				f_r.fr_reflect = vec3(0.0);
 			}
 			break;
 		}
 		case 2:{
-			// 折射材质（玻璃等）
+			// // 折射材质（玻璃等）
+			// vec3 V = normalize(-wo);
+			// float cosTheta = dot(N, V);
+			// float eta = (cosTheta > 0.0) ? (1.0 / material.IOR) : material.IOR;
+			
+			// // 直接计算折射方向
+			// vec3 refracted = refract(-V, N, eta);
+			
+			// // 处理全内反射
+			// if (length(refracted) < EPSILON) {
+			// 	f_r.fr_reflect = vec3(0.0); // 全反射时无透射
+			// } else {
+			// 	// 基础折射颜色计算
+			// 	f_r.fr_refract = material.baseColor * (1.0 / (eta * eta)); // 考虑折射率能量衰减
+			// }
+			// break;
+
+			// 折射材质（玻璃等）同时包含反射和折射
 			vec3 V = normalize(-wo);
 			float cosTheta = dot(N, V);
 			float eta = (cosTheta > 0.0) ? (1.0 / material.IOR) : material.IOR;
 			
-			// 直接计算折射方向
-			vec3 refracted = refract(-V, N, eta);
+			// 添加金属材质的反射计算逻辑
+			vec3 L = wi;
+			vec3 H = normalize(V + L);
 			
-			// 处理全内反射
+			// 计算各点积项
+			float NdotV = max(dot(N, V), EPSILON);
+			float NdotL = max(dot(N, L), EPSILON);
+			float NdotH = max(dot(N, H), EPSILON);
+			float VdotH = max(dot(V, H), EPSILON);
+			
+			// 使用粗糙度的平方进行物理校正
+			float roughness = material.roughness * material.roughness;
+			
+			// 计算各项参数
+			float D = DistributionGGX(N, H, roughness);
+			float G = GeometrySmith(NdotV, NdotL, roughness);
+			vec3 F0 = mix(vec3(0.04), material.baseColor, material.metallic);
+			vec3 F = fresnelSchlick(VdotH, F0);
+			
+			// Cook-Torrance BRDF
+			vec3 numerator = D * G * F;
+			float denominator = 4.0 * NdotV * NdotL;
+			vec3 specular = numerator / max(denominator, 0.001);
+			
+			// 漫反射衰减
+			vec3 kD = (vec3(1.0) - F) * (1.0 - material.metallic);
+			f_r.fr_reflect = kD * material.baseColor / PI + specular;
+
+			// 原有折射计算逻辑
+			vec3 refracted = refract(-V, N, eta);
 			if (length(refracted) < EPSILON) {
-				f_r = vec3(0.0); // 全反射时无透射
+				f_r.fr_refract = vec3(0.0); // 全反射时无透射
 			} else {
-				// 基础折射颜色计算
-				f_r = material.baseColor * (1.0 / (eta * eta)); // 考虑折射率能量衰减
+				// 基础折射颜色计算，考虑菲涅尔反射的影响
+				f_r.fr_refract = material.baseColor * (1.0 - F) * (1.0 / (eta * eta));
 			}
 			break;
+
 		}
 	}
 	return f_r;
@@ -824,6 +896,7 @@ vec3 shading(Ray r)
 	float P_RR = 0.8;
 	int flag = 1;
 	Ray rayNext;
+	BRDFResult f_r;
 
 	// ========== 直接光照部分 ==========
 	if(rec.isHit && rec.material.transmission != -1)
@@ -864,12 +937,13 @@ vec3 shading(Ray r)
 			float lightArea = ((getTriangleArea(lightTri) * lightTriCount));
 			float pdf_light = 1.0 / lightArea;
 
-			vec3 f_r = eval_(-shadowRay.direction, -r.direction, rec.Normal, rec.material);
 			vec3 L_i = 8.0 * vec3(0.747+0.058, 0.747+0.258, 0.747) 
 					+ 15.6 * vec3 (0.740+0.287,0.740+0.160,0.740) 
 					+ 18.4 * vec3(0.737+0.642,0.737+0.159,0.737);
 			
-			L_dir = throughput * (L_i * 0.3) * f_r * geometry_term / pdf_light;
+			f_r = eval_(-shadowRay.direction, -r.direction, rec.Normal, rec.material);
+
+			L_dir = throughput * (L_i * 0.5) * f_r.fr_reflect * geometry_term / pdf_light;
 		}
 	}
 
@@ -881,35 +955,63 @@ vec3 shading(Ray r)
 
 		// 间接光照
 		if(depth > 3 && rand() > P_RR) break;
+
 		sampleDir sampleResult = sample_(rec.viewDir, rec.Normal, rec.material);
 		vec3 dir_next = sampleResult.reflectDir;
-		vec3 f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+
+		f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
 		float cosine = max(0.0, dot(dir_next, rec.Normal));
 		float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
 		
 		if(rec.material.transmission == -1)
 		{
-			L_indir = throughput * (rec.material.emissive * 0.3);
+			L_indir = throughput * (rec.material.emissive * 0.5);
 			flag = 0;
 			break;
 		}
 		else if(rec.material.transmission == 0)
 		{
-			throughput = throughput * (f_r * cosine) / pdf / P_RR;
+			throughput = throughput * (f_r.fr_reflect * cosine) / pdf / P_RR;
 			throughput = clamp(throughput, vec3(0.0), vec3(1.0));
 		}
 		else if(rec.material.transmission == 1)
 		{
-			throughput = throughput * (f_r * cosine) / pdf;
+			throughput = throughput * (f_r.fr_reflect * cosine) / pdf;
 			throughput = clamp(throughput, vec3(0.0), vec3(1.0));
 		}
 		else if(rec.material.transmission == 2)
 		{
-			throughput = throughput * (f_r * cosine) / pdf;
+			if(sampleResult.refractDir == vec3(0.0))
+			{
+				dir_next = sampleResult.reflectDir;
+            	throughput = vec3(1.0);
+			}
+			else
+			{
+				if(rand() > P_RR)
+				{
+					dir_next = sampleResult.reflectDir;
+				}
+				else
+				{
+					dir_next = sampleResult.refractDir;
+				}
+			}
+
+			float kr = fresnel(-rec.viewDir, rec.Normal, rec.material.IOR);
+
+			vec3 combined = f_r.fr_reflect * kr + f_r.fr_refract * (1 - kr);
+			throughput = throughput * (combined * cosine) / pdf;
 			throughput = clamp(throughput, vec3(0.0), vec3(1.0));
 		}
 
-		rayNext.origin = rec.Pos + rec.Normal * 0.001;
+		// 更新光线起点（根据材质类型调整偏移方向）
+		if(rec.material.transmission == 2) {
+			vec3 offsetDir = dot(dir_next, rec.Normal) > 0 ? rec.Normal : -rec.Normal;
+			rayNext.origin = rec.Pos + offsetDir * 0.001;
+		} else {
+			rayNext.origin = rec.Pos + rec.Normal * 0.001;
+		}
 		rayNext.direction = dir_next;
 		rayNext.hitMin = 100000;
 

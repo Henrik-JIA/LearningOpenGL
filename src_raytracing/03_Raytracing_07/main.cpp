@@ -164,10 +164,11 @@ int main()
 	metal_yellow.roughness = 0.05;
     metal_yellow.baseColor = glm::vec3(0.95f, 0.85f, 0.3f);
 
-    Material mirror_white;
-    mirror_white.transmission = 2.0f;
-    mirror_white.roughness = 0.01f;
-    mirror_white.baseColor = glm::vec3(0.725f, 0.71f, 0.68f); // 白色
+    Material transparency_white;
+    transparency_white.transmission = 2.0f;
+    transparency_white.roughness = 0.05f;
+	transparency_white.IOR = 1.6;
+    transparency_white.baseColor = glm::vec3(0.1f, 0.6f, 0.3f); // 白色
 
 	
 	// 加载数据纹理
@@ -182,7 +183,7 @@ int main()
 	Model tallbox("../static/model/cornellbox/tallbox.obj");
 	getTextureWithTransform(tallbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							white); 
+							transparency_white); 
 	Model shortbox("../static/model/cornellbox/shortbox.obj");
 	getTextureWithTransform(shortbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
@@ -196,7 +197,7 @@ int main()
 	Model floor("../static/model/cornellbox/floor.obj");
 	getTextureWithTransform(floor.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							metal_white); // 白色
+							white); // 白色
 	Model right("../static/model/cornellbox/right.obj");
 	getTextureWithTransform(right.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
