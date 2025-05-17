@@ -182,21 +182,21 @@ int main()
 	Model tallbox("../static/model/cornellbox/tallbox.obj");
 	getTextureWithTransform(tallbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							metal_white); // 白色
+							white); 
 	Model shortbox("../static/model/cornellbox/shortbox.obj");
 	getTextureWithTransform(shortbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							orange); // 白色
+							white); 
 	
-	Model bunny("../static/model/bunny/bunny.obj");
-	getTextureWithTransform(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
-							glm::vec3(-0.17f, 0.15f, -0.23f), 1.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							metal_yellow); 
+	// Model bunny("../static/model/bunny/bunny.obj");
+	// getTextureWithTransform(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+	// 						glm::vec3(-0.17f, 0.15f, -0.23f), 1.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+	// 						metal_yellow); 
 	
 	Model floor("../static/model/cornellbox/floor.obj");
 	getTextureWithTransform(floor.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							white); // 白色
+							metal_white); // 白色
 	Model right("../static/model/cornellbox/right.obj");
 	getTextureWithTransform(right.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),

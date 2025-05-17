@@ -20,7 +20,7 @@ struct Material {
     float clearcoat = 0.0;
     float clearcoatGloss = 0.0;
     float IOR = 1.0;
-    float transmission = 0.0; // 暂时设置为材质属性 {-1: 灯光, 0: 漫反射, 1: 金属, 2: 镜子, 3: 折射}
+    float transmission = 0.0; // 暂时设置为材质属性 {-1: 灯光, 0: 漫反射, 1: 金属, 2: 折射}
 };
 
 class Triangle {
