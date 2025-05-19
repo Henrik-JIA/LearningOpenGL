@@ -37,8 +37,8 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset); // 滚
 // unsigned int SCR_WIDTH = 1200;
 // unsigned int SCR_HEIGHT = 800;
 
-unsigned int SCR_WIDTH = 400;
-unsigned int SCR_HEIGHT = 300;
+unsigned int SCR_WIDTH = 800;
+unsigned int SCR_HEIGHT = 600;
 
 // camera value
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.5f, 2.5f);
