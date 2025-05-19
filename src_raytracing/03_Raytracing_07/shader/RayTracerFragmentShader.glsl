@@ -154,7 +154,7 @@ void main() {
 	cameraRay.hitMin = 100000.0;
 
 	vec3 curColor = vec3(0.0, 0.0, 0.0);
-	int N = 10;
+	int N = 5;
 	for (int i = 0; i < N; i++) 
 	{
 		if(IntersectBVH(cameraRay)) {
@@ -929,7 +929,7 @@ vec3 shading(Ray r)
 
 		// 可见性检测
 		bool hitShadow = IntersectBVH(shadowRay);
-		if(abs(rec.rayHitMin - dist) < 0.0011)
+		if(abs(rec.rayHitMin - dist) < 0.0013)
 		{
 			float cosTheta = max(dot(rec.Normal, -shadowRay.direction), 0.0); // 入射角
 			float cosThetaPrime = max(dot(lightNormal, shadowRay.direction), 0.0); // 光源与法线夹角 

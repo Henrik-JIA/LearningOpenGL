@@ -34,8 +34,11 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos); // 鼠标回�
 void mouse_button_calback(GLFWwindow *window, int button, int action, int mods); // 鼠标按钮回调函数
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset); // 滚轮回调函数
 
-unsigned int SCR_WIDTH = 1200;
-unsigned int SCR_HEIGHT = 800;
+// unsigned int SCR_WIDTH = 1200;
+// unsigned int SCR_HEIGHT = 800;
+
+unsigned int SCR_WIDTH = 400;
+unsigned int SCR_HEIGHT = 300;
 
 // camera value
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.5f, 2.5f);
@@ -156,7 +159,7 @@ int main()
 
 	Material metal_white;
     metal_white.transmission = 1.0f;
-	metal_white.roughness = 0.05;
+	metal_white.roughness = 0.01;
     metal_white.baseColor = glm::vec3(0.725f, 0.71f, 0.68f);
 
 	Material metal_yellow;
@@ -183,16 +186,16 @@ int main()
 	Model tallbox("../static/model/cornellbox/tallbox.obj");
 	getTextureWithTransform(tallbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							white); 
+							metal_white); 
 	Model shortbox("../static/model/cornellbox/shortbox.obj");
 	getTextureWithTransform(shortbox.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
 							white); 
 	
-	// Model bunny("../static/model/bunny/bunny.obj");
-	// getTextureWithTransform(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
-	// 						glm::vec3(-0.17f, 0.15f, -0.25f), 1.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-	// 						transparency_yellow); 
+	Model bunny("../static/model/bunny/bunny.obj");
+	getTextureWithTransform(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+							glm::vec3(-0.16f, 0.15f, -0.25f), 1.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+							metal_yellow); 
 	
 	Model floor("../static/model/cornellbox/floor.obj");
 	getTextureWithTransform(floor.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
