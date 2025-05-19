@@ -167,12 +167,13 @@ void main() {
 		}
 	}
 	curColor /= float(N);
-	
 
-
-	// vec3 curColor = shading(cameraRay);
-	
 	curColor = (1.0 / float(camera.LoopNum))*curColor + (float(camera.LoopNum - 1) / float(camera.LoopNum)) * hist;
+
+	curColor.r = clamp(curColor.r, 0.0, 1.0);
+	curColor.g = clamp(curColor.g, 0.0, 1.0);
+	curColor.b = clamp(curColor.b, 0.0, 1.0);
+
 	FragColor = vec4(curColor, 1.0);
 
 }
@@ -501,7 +502,7 @@ vec3 toWorld(vec3 v, vec3 N) {
  * @return 反射方向向量 (已归一化)
  */
 vec3 calculateReflect(vec3 I, vec3 N, float roughness) {
-    vec3 baseReflect = I - 2.0 * dot(I, N) * N;
+    vec3 baseReflect = -I + 2.0 * dot(I, N) * N;
     
     // 添加粗糙度扰动
     if(roughness > 0.0) {
@@ -520,8 +521,8 @@ vec3 calculateReflect(vec3 I, vec3 N, float roughness) {
  */
 vec3 calculateRefract(vec3 I, vec3 N, float ior) {
     float cosi = clamp(dot(I, N), -1.0, 1.0);
-    float etai = 1.0;
-    float etat = ior;
+    float etai = 1.0; // 入射介质（默认空气）
+    float etat = ior; // 透射介质
     vec3 n = N;
     
     // 处理光线从内部射出的情况
@@ -567,7 +568,7 @@ sampleDir sample_(vec3 wo, vec3 N, Material material){
 			break;
 		}
 		case 1: { // 镜面反射材质
-			result.reflectDir = calculateReflect(-wo, N, material.roughness);			
+			result.reflectDir = calculateReflect(wo, N, material.roughness);			
 			break;
 		}
 		case 2: { // 折射材质
@@ -601,7 +602,7 @@ sampleDir sample_(vec3 wo, vec3 N, Material material){
 			// }
 			// break;
 
-			vec3 V = normalize(-wo);
+			vec3 V = normalize(wo);
 			float cosTheta = dot(N, V);
 			float eta = (cosTheta > 0.0) ? (1.0 / material.IOR) : material.IOR;
 			
@@ -609,11 +610,11 @@ sampleDir sample_(vec3 wo, vec3 N, Material material){
 			result.reflectDir = calculateReflect(V, N, material.roughness);
 			result.refractDir = calculateRefract(V, N, eta);
 			
-			// 处理全内反射
-			if(length(result.refractDir) < EPSILON) {
-				result.reflectDir = calculateReflect(V, N, material.roughness);
-				result.refractDir = vec3(0.0);
-			}
+			// // 处理全内反射
+			// if(length(result.refractDir) == 0.0) {
+			// 	result.reflectDir = calculateReflect(V, N, material.roughness);
+			// 	result.refractDir = vec3(0.0);
+			// }
 			break;
 
 		}
@@ -960,12 +961,13 @@ vec3 shading(Ray r)
 		vec3 dir_next = sampleResult.reflectDir;
 
 		f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
+
 		float cosine = max(0.0, dot(dir_next, rec.Normal));
 		float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
 		
 		if(rec.material.transmission == -1)
 		{
-			L_indir = throughput * (rec.material.emissive * 0.5);
+			L_indir = throughput * (rec.material.emissive * 0.3);
 			flag = 0;
 			break;
 		}
@@ -981,10 +983,12 @@ vec3 shading(Ray r)
 		}
 		else if(rec.material.transmission == 2)
 		{
+			bool isRefracting = false;
+
 			if(sampleResult.refractDir == vec3(0.0))
 			{
 				dir_next = sampleResult.reflectDir;
-            	throughput = vec3(1.0);
+            	// throughput = vec3(1.0);
 			}
 			else
 			{
@@ -995,13 +999,20 @@ vec3 shading(Ray r)
 				else
 				{
 					dir_next = sampleResult.refractDir;
+					cosine = abs(dot(dir_next, rec.Normal));
+					isRefracting = true;
 				}
 			}
 
 			float kr = fresnel(-rec.viewDir, rec.Normal, rec.material.IOR);
 
-			vec3 combined = f_r.fr_reflect * kr + f_r.fr_refract * (1 - kr);
-			throughput = throughput * (combined * cosine) / pdf;
+			// vec3 combined = f_r.fr_reflect * kr + f_r.fr_refract * (1 - kr);
+			vec3 brdfTerm = isRefracting 
+				? f_r.fr_refract * (1.0 - kr) 
+				: f_r.fr_reflect * kr;
+
+			// throughput = throughput * (combined * cosine) / pdf;
+			throughput = throughput * (brdfTerm * cosine) / pdf;
 			throughput = clamp(throughput, vec3(0.0), vec3(1.0));
 		}
 
@@ -1023,8 +1034,9 @@ vec3 shading(Ray r)
 		}
 	}
     
-    return L_dir + L_indir;
-
+	vec3 result = L_dir + L_indir;
+	
+    return result;
 	
 }
 
