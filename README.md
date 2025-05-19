@@ -43,3 +43,4 @@ Reference code:
 - https://github.com/Azalea8/OpenGL_RayTracer 
 - https://github.com/feimos32/RayTracerBasedOnGLSL
 - https://github.com/AKGWSB/EzRT
+- https://github.com/sunflower7910/PathTracing_CG
