@@ -154,7 +154,7 @@ void main() {
 	cameraRay.hitMin = 100000.0;
 
 	vec3 curColor = vec3(0.0, 0.0, 0.0);
-	int N = 5;
+	int N = 10;
 	for (int i = 0; i < N; i++) 
 	{
 		if(IntersectBVH(cameraRay)) {
@@ -168,11 +168,20 @@ void main() {
 	}
 	curColor /= float(N);
 
-	curColor = (1.0 / float(camera.LoopNum))*curColor + (float(camera.LoopNum - 1) / float(camera.LoopNum)) * hist;
+	
+	// curColor.r = clamp(curColor.r, 0.0, 1.0);
+	// curColor.g = clamp(curColor.g, 0.0, 1.0);
+	// curColor.b = clamp(curColor.b, 0.0, 1.0);
 
-	curColor.r = clamp(curColor.r, 0.0, 1.0);
-	curColor.g = clamp(curColor.g, 0.0, 1.0);
-	curColor.b = clamp(curColor.b, 0.0, 1.0);
+	// curColor = (1.0 / float(camera.LoopNum))*curColor + (float(camera.LoopNum - 1) / float(camera.LoopNum)) * hist;
+	// 更高效的写法：
+	float blendWeight = 1.0 / float(camera.LoopNum);
+	curColor = mix(hist, curColor, blendWeight);
+
+	curColor = clamp(curColor, vec3(0.0), vec3(1.0));
+	// curColor.r = clamp(curColor.r, 0.0, 1.0);
+	// curColor.g = clamp(curColor.g, 0.0, 1.0);
+	// curColor.b = clamp(curColor.b, 0.0, 1.0);
 
 	FragColor = vec4(curColor, 1.0);
 
@@ -391,97 +400,192 @@ float getTriangleArea(Triangle tri) {
     return 0.5 * length(cross(edge1, edge2));
 }
 
+// 旧版BVH光线与三角形相交检测，这个也是可以用的，但是会存在三角形法向量始终超外的问题
+// bool IntersectBVH(Ray ray) {
+// 	// if (!bvhTree.nodes) return false;
+// 	bool hit = false;
+// 	rec.isHit = false;
+// 	// 计算射线方向的倒数
+// 	vec3 invDir = vec3(1.0 / ray.direction.x, 1.0 / ray.direction.y, 1.0 / ray.direction.z);
+	
+// 	// 计算射线方向的符号
+// 	bool dirIsNeg[3];
+// 	dirIsNeg[0] = (invDir.x < 0.0); 
+// 	dirIsNeg[1] = (invDir.y < 0.0); 
+// 	dirIsNeg[2] = (invDir.z < 0.0);
+	
+// 	// Follow ray through BVH nodes to find primitive intersections
+// 	// 接下来射线遍历BVH节点，找到与三角形相交的点
+// 	int toVisitOffset = 0; // 访问节点偏移量
+// 	int currentNodeIndex = 0; // 当前节点索引
+// 	int nodesToVisit[64]; // 访问节点栈，最多64个
+
+// 	Triangle tri; // 初始化三角形
+// 	int offset = 0;
+// 	while (true) {
+// 		// 获取当前BVH节点
+// 		LinearBVHNode node = getLinearBVHNode(currentNodeIndex);
+
+// 		// 当前节点的包围盒
+// 		Bound3f bound; 
+// 		bound.pMin = node.pMin; 
+// 		bound.pMax = node.pMax;
+
+// 		// 如果射线与当前BVH节点相交
+// 		if (IntersectBound(bound, ray, invDir, dirIsNeg)) {
+// 			// 判断当前节点是否为叶子节点
+// 			if (node.nPrimitives > 0) {
+// 				// 遍历当前节点的所有三角形
+// 				for (int i = 0; i < node.nPrimitives; ++i) {
+// 					offset = (node.childOffset + i); // 计算三角形在数据存储中的索引位置
+// 					Triangle tri_t = getTriangle(offset); // 根据索引获取三角形数据
+// 					float dis_t = hitTriangle(tri_t, ray); // 计算光线与三角形交点距离
+// 					// 如果交点距离大于0且小于当前最小距离
+// 					if (dis_t > 0 && dis_t < ray.hitMin) {
+// 						ray.hitMin = dis_t; // 更新最小距离
+// 						tri = tri_t; // 更新三角形
+// 						hit = true; // 设置命中标志
+// 					}
+// 				}
+// 				// 栈空检测
+// 				// 当栈指针为0时表示没有待访问节点，终止循环
+// 				if (toVisitOffset == 0) break; 
+// 				// 从访问节点栈中获取下一个节点
+// 				currentNodeIndex = nodesToVisit[--toVisitOffset];
+// 			}
+// 			else {
+// 				// 把 BVH node 放入 _nodesToVisit_ stack, advance to near
+// 				// 根据射线入射方向的符号，决定访问哪个子节点
+// 				if (bool(dirIsNeg[node.axis])) {
+// 					nodesToVisit[toVisitOffset++] = currentNodeIndex + 1;
+// 					currentNodeIndex = node.childOffset;
+// 				}
+// 				else {
+// 					nodesToVisit[toVisitOffset++] = node.childOffset;
+// 					currentNodeIndex = currentNodeIndex + 1;
+// 				}
+// 			}
+// 		}
+// 		else {
+// 			if (toVisitOffset == 0) break;
+// 			currentNodeIndex = nodesToVisit[--toVisitOffset];
+// 		}
+// 	}
+
+// 	if (hit) {
+// 		vec3 rawNormal = getTriangleNormal(tri);
+// 		rec.isHit = true;
+// 		rec.isInside = (dot(rawNormal, ray.direction) > 0.0);
+// 		rec.rayHitMin = ray.hitMin;
+// 		rec.Pos = ray.origin + ray.hitMin * ray.direction;
+// 		// 我也不清楚模型的顶点坐标是顺时针还是逆时针，加负号效果是对的。
+// 		// rec.Normal = -getTriangleNormal(tri);
+// 		// 下面注释的glsl代码可以解决面法向量始终超外，但会影响帧率
+// 		rec.Normal = (dot(rawNormal, -ray.direction) > 0.0) ? rawNormal : -rawNormal;
+// 		rec.viewDir = -ray.direction;
+// 		rec.triangleIndex = offset;
+// 		rec.triangleArea = getTriangleArea(tri);
+// 		// rec.albedo = vec3(0.83, 0.73, 0.1); 
+// 		// rec.albedo = rec.Normal * 0.5 + 0.5; // 法线可视化
+// 		rec.material = tri.material; 
+// 		// rec.materialIndex = 0;
+// 		// rec.materialIndex = tri.materialType;
+// 	}
+// 	return hit;
+// }
+
+// 优化后的BVH光线与三角形相交检测，防止光线与三角形相交时，三角形法向量始终超外
 bool IntersectBVH(Ray ray) {
-	// if (!bvhTree.nodes) return false;
-	bool hit = false;
-	rec.isHit = false;
-	// 计算射线方向的倒数
-	vec3 invDir = vec3(1.0 / ray.direction.x, 1.0 / ray.direction.y, 1.0 / ray.direction.z);
-	
-	// 计算射线方向的符号
-	bool dirIsNeg[3];
-	dirIsNeg[0] = (invDir.x < 0.0); 
-	dirIsNeg[1] = (invDir.y < 0.0); 
-	dirIsNeg[2] = (invDir.z < 0.0);
-	
-	// Follow ray through BVH nodes to find primitive intersections
-	// 接下来射线遍历BVH节点，找到与三角形相交的点
-	int toVisitOffset = 0; // 访问节点偏移量
-	int currentNodeIndex = 0; // 当前节点索引
-	int nodesToVisit[64]; // 访问节点栈，最多64个
+    rec.isHit = false;
+    bool hit = false;
+    Triangle tri;
+    int hitTriangleOffset = -1; // 存储命中的三角形偏移量
 
-	Triangle tri; // 初始化三角形
-	int offset = 0;
-	while (true) {
-		// 获取当前BVH节点
-		LinearBVHNode node = getLinearBVHNode(currentNodeIndex);
+    // 移除const修饰符
+    vec3 invDir = 1.0 / ray.direction;
+    bool dirIsNeg[3] = bool[](ray.direction.x < 0.0, ray.direction.y < 0.0, ray.direction.z < 0.0);
+    
+    int nodesToVisit[32];
+    int stackPtr = 0;
+    int currentNodeIndex = 0;
+    float tMax = ray.hitMin;
 
-		// 当前节点的包围盒
-		Bound3f bound; 
-		bound.pMin = node.pMin; 
-		bound.pMax = node.pMax;
+    while (stackPtr >= 0 && stackPtr < 32) { // 增加栈保护
+        LinearBVHNode node = getLinearBVHNode(currentNodeIndex);
+        
+        // 优化后的包围盒检测
+        bool intersect = true;
+        float tMin = 0.0;
+        float tMaxBox = tMax;
+        
+        for (int i = 0; i < 3; ++i) {
+            float t0 = (node.pMin[i] - ray.origin[i]) * invDir[i];
+            float t1 = (node.pMax[i] - ray.origin[i]) * invDir[i];
+            
+            if (invDir[i] < 0.0) {
+                float tmp = t0;
+                t0 = t1;
+                t1 = tmp;
+            }
+            
+            tMin = max(tMin, t0);
+            tMaxBox = min(tMaxBox, t1);
+            
+            if (tMin > tMaxBox) {
+                intersect = false;
+                break;
+            }
+        }
 
-		// 如果射线与当前BVH节点相交
-		if (IntersectBound(bound, ray, invDir, dirIsNeg)) {
-			// 判断当前节点是否为叶子节点
-			if (node.nPrimitives > 0) {
-				// 遍历当前节点的所有三角形
-				for (int i = 0; i < node.nPrimitives; ++i) {
-					offset = (node.childOffset + i); // 计算三角形在数据存储中的索引位置
-					Triangle tri_t = getTriangle(offset); // 根据索引获取三角形数据
-					float dis_t = hitTriangle(tri_t, ray); // 计算光线与三角形交点距离
-					// 如果交点距离大于0且小于当前最小距离
-					if (dis_t > 0 && dis_t < ray.hitMin) {
-						ray.hitMin = dis_t; // 更新最小距离
-						tri = tri_t; // 更新三角形
-						hit = true; // 设置命中标志
-					}
-				}
-				// 栈空检测
-				// 当栈指针为0时表示没有待访问节点，终止循环
-				if (toVisitOffset == 0) break; 
-				// 从访问节点栈中获取下一个节点
-				currentNodeIndex = nodesToVisit[--toVisitOffset];
-			}
-			else {
-				// 把 BVH node 放入 _nodesToVisit_ stack, advance to near
-				// 根据射线入射方向的符号，决定访问哪个子节点
-				if (bool(dirIsNeg[node.axis])) {
-					nodesToVisit[toVisitOffset++] = currentNodeIndex + 1;
-					currentNodeIndex = node.childOffset;
-				}
-				else {
-					nodesToVisit[toVisitOffset++] = node.childOffset;
-					currentNodeIndex = currentNodeIndex + 1;
-				}
-			}
-		}
-		else {
-			if (toVisitOffset == 0) break;
-			currentNodeIndex = nodesToVisit[--toVisitOffset];
-		}
-	}
+        if (!intersect || tMin > tMax) {
+            if (stackPtr == 0) break;
+            currentNodeIndex = nodesToVisit[--stackPtr];
+            continue;
+        }
 
-	if (hit) {
-		vec3 rawNormal = getTriangleNormal(tri);
-		rec.isHit = true;
-		rec.isInside = (dot(rawNormal, ray.direction) > 0.0);
-		rec.rayHitMin = ray.hitMin;
-		rec.Pos = ray.origin + ray.hitMin * ray.direction;
-		// 我也不清楚模型的顶点坐标是顺时针还是逆时针，加负号效果是对的。
-		// rec.Normal = -getTriangleNormal(tri);
-		// 下面注释的glsl代码可以解决面法向量始终超外，但会影响帧率
-		rec.Normal = (dot(rawNormal, -ray.direction) > 0.0) ? rawNormal : -rawNormal;
-		rec.viewDir = -ray.direction;
-		rec.triangleIndex = offset;
-		rec.triangleArea = getTriangleArea(tri);
-		// rec.albedo = vec3(0.83, 0.73, 0.1); 
-		// rec.albedo = rec.Normal * 0.5 + 0.5; // 法线可视化
-		rec.material = tri.material; 
-		// rec.materialIndex = 0;
-		// rec.materialIndex = tri.materialType;
-	}
-	return hit;
+        if (node.nPrimitives > 0) {
+            // 叶子节点处理
+            for (int i = 0; i < node.nPrimitives; ++i) {
+                int offset = node.childOffset + i;
+                Triangle tri_t = getTriangle(offset);
+                float dis_t = hitTriangle(tri_t, ray);
+                
+                if (dis_t > 0.0 && dis_t < ray.hitMin) {
+                    ray.hitMin = dis_t;
+                    tri = tri_t;
+                    hit = true;
+                    hitTriangleOffset = offset; // 保存命中的三角形偏移
+                }
+            }
+            
+            if (stackPtr == 0) break;
+            currentNodeIndex = nodesToVisit[--stackPtr];
+        } else {
+            // 内部节点处理
+            if (dirIsNeg[node.axis]) {
+                nodesToVisit[stackPtr++] = currentNodeIndex + 1;
+                currentNodeIndex = node.childOffset;
+            } else {
+                nodesToVisit[stackPtr++] = node.childOffset;
+                currentNodeIndex = currentNodeIndex + 1;
+            }
+        }
+    }
+
+    if (hit) {
+        vec3 rawNormal = getTriangleNormal(tri);
+        rec.isHit = true;
+        rec.isInside = dot(rawNormal, ray.direction) > 0.0;
+        rec.rayHitMin = ray.hitMin;
+        rec.Pos = ray.origin + ray.hitMin * ray.direction;
+        rec.Normal = dot(rawNormal, -ray.direction) > 0.0 ? rawNormal : -rawNormal;
+        rec.viewDir = -ray.direction;
+        rec.triangleIndex = hitTriangleOffset; // 使用保存的偏移量
+        rec.triangleArea = getTriangleArea(tri);
+        rec.material = tri.material;
+    }
+    
+    return hit;
 }
 
 // =========================================================
@@ -898,21 +1002,22 @@ vec3 shading(Ray r)
 	int flag = 1;
 	Ray rayNext;
 	BRDFResult f_r;
+	float restrain = 0.3; // 衰减系数，用于控制光源直接作用着色点的能量
+
+	// 随机选择一个光源三角形
+	int lightTriCount = 2;
+	int lightIndex = int(rand() * lightTriCount);
+	lightIndex = clamp(lightIndex, 0, lightTriCount-1);
+	Triangle lightTri = triLight[lightIndex];
+
+	// 计算光源三角形的法向量
+	vec3 e1 = lightTri.p1 - lightTri.p0;
+	vec3 e2 = lightTri.p2 - lightTri.p0;
+	vec3 lightNormal = normalize(cross(e1, e2));
 
 	// ========== 直接光照部分 ==========
 	if(rec.isHit && rec.material.transmission != -1)
 	{
-		// 随机选择一个光源三角形
-		int lightTriCount = 2;
-		int lightIndex = int(rand() * lightTriCount);
-		lightIndex = clamp(lightIndex, 0, lightTriCount-1);
-		Triangle lightTri = triLight[lightIndex];
-
-		// 计算光源三角形的法向量
-		vec3 e1 = lightTri.p1 - lightTri.p0;
-		vec3 e2 = lightTri.p2 - lightTri.p0;
-		vec3 lightNormal = normalize(cross(e1, e2));
-
 		// 在三角形表面均匀采样
 		float u = rand();
 		float v = rand() * (1.0 - u);
@@ -944,7 +1049,7 @@ vec3 shading(Ray r)
 			
 			f_r = eval_(-shadowRay.direction, -r.direction, rec.Normal, rec.material);
 
-			L_dir = throughput * (L_i * 0.5) * f_r.fr_reflect * geometry_term / pdf_light;
+			L_dir = throughput * (L_i * restrain) * f_r.fr_reflect * geometry_term / pdf_light;
 		}
 	}
 
@@ -962,33 +1067,33 @@ vec3 shading(Ray r)
 
 		f_r = eval_(dir_next, rec.viewDir, rec.Normal, rec.material);
 
-		float cosine = max(0.0, dot(dir_next, rec.Normal));
+		float cosine = clamp(dot(dir_next, rec.Normal), -1.0, 1.0);
 		float pdf = pdf_(rec.viewDir, dir_next, rec.Normal, rec.material);
 		
 		if(rec.material.transmission == -1)
 		{
-			L_indir = throughput * (rec.material.emissive * 0.3);
+			cosine = abs(dot(rec.viewDir, rec.Normal));
+			
+			L_indir = throughput * (rec.material.emissive * restrain * cosine);
+			
 			flag = 0;
 			break;
 		}
-		else if(rec.material.transmission == 0)
+		else if(rec.material.transmission == 0) // 漫反射
 		{
-			throughput = throughput * (f_r.fr_reflect * cosine) / pdf / P_RR;
-			throughput = clamp(throughput, vec3(0.0), vec3(1.0));
+			throughput = throughput * (f_r.fr_reflect * cosine) / (pdf * P_RR);
 		}
-		else if(rec.material.transmission == 1)
+		else if(rec.material.transmission == 1) // 金属
 		{
 			throughput = throughput * (f_r.fr_reflect * cosine) / pdf;
-			throughput = clamp(throughput, vec3(0.0), vec3(1.0));
 		}
-		else if(rec.material.transmission == 2)
+		else if(rec.material.transmission == 2) // 折射
 		{
 			bool isRefracting = false;
 
 			if(sampleResult.refractDir == vec3(0.0))
 			{
 				dir_next = sampleResult.reflectDir;
-            	// throughput = vec3(1.0);
 			}
 			else
 			{
@@ -1006,14 +1111,14 @@ vec3 shading(Ray r)
 
 			float kr = fresnel(-rec.viewDir, rec.Normal, rec.material.IOR);
 
-			// vec3 combined = f_r.fr_reflect * kr + f_r.fr_refract * (1 - kr);
-			vec3 brdfTerm = isRefracting 
-				? f_r.fr_refract * (1.0 - kr) 
-				: f_r.fr_reflect * kr;
+			vec3 combined = f_r.fr_reflect * kr + f_r.fr_refract * (1 - kr);
+			// vec3 brdfTerm = isRefracting 
+			// 	? f_r.fr_refract * (1.0 - kr) 
+			// 	: f_r.fr_reflect * kr;
 
-			// throughput = throughput * (combined * cosine) / pdf;
-			throughput = throughput * (brdfTerm * cosine) / pdf;
-			throughput = clamp(throughput, vec3(0.0), vec3(1.0));
+			throughput = throughput * (combined * cosine) / (pdf * P_RR);
+			// throughput = throughput * (brdfTerm * cosine) / pdf;
+			// throughput = clamp(throughput, vec3(0.0), vec3(1.0));
 		}
 
 		// 更新光线起点（根据材质类型调整偏移方向）

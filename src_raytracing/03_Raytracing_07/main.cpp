@@ -192,10 +192,10 @@ int main()
 							glm::vec3(0.0f, 0.0f, 0.0f), 0.001f, 180.0f, glm::vec3(0.0f, 1.0f, 0.0f),
 							white); 
 	
-	Model bunny("../static/model/bunny/bunny.obj");
-	getTextureWithTransform(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
-							glm::vec3(-0.16f, 0.15f, -0.25f), 1.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f),
-							metal_yellow); 
+	// Model bunny("../static/model/bunny/bunny.obj");
+	// getTextureWithTransform(bunny.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 
+	// 						glm::vec3(-0.16f, 0.15f, -0.25f), 1.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f),
+	// 						metal_yellow); 
 	
 	Model floor("../static/model/cornellbox/floor.obj");
 	getTextureWithTransform(floor.meshes, RayTracerShader, ObjTex, primitives, bvhTree, 

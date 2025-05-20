@@ -108,3 +108,13 @@ RayTracerShader.setVec3("triLight[0].p2", transformedLightVertices[2]);
 ### 直接光照+间接光照 结果
 结合两种光照计算方式，获得物理精确的完整照明效果。兼具清晰的光影和丰富的色彩互溢。
 ![image-20250519214447512](./assets/image-20250519214447512.png)
+
+
+
+## 存在问题
+
+- 目前折射反射模型rec.material.transmission == 2存在问题，渲染效果不正常。
+
+- 此外间接光照效率较低。
+
+![image-20250520133308900](./assets/image-20250520133308900.png)
